@@ -7,6 +7,7 @@ wandb
 DPR
 logging
 .vscode/
+.idea/
 test
 artifacts
 *.out

@@ -14,6 +14,26 @@ import re
 For linear probe/fine tune/zero-shot
 """
 
+EXP_TEXT_COLUMNS = [
+    "exp",
+    "explanation",
+    "explanation_text",
+    "explain_text",
+    "rationale",
+    "reason",
+    "reasoning",
+]
+
+
+def get_exp_text_from_gt(gt_df, length):
+    if gt_df is None:
+        return [" "] * length
+    for column in EXP_TEXT_COLUMNS:
+        if column in gt_df.columns:
+            exp_text = gt_df[column].to_list()
+            return [" " if item is None or pd.isna(item) else str(item) for item in exp_text]
+    return [" "] * length
+
 
 def to_device(data, device):
     """Move tensor(s) to chosen device"""
@@ -68,10 +88,11 @@ class image_text_dataset(Dataset):
         device="cuda",
         image_size=224,
     ):
-        # img_data is a list of [list_image_path,list_text,list_label,list_ids]
-        list_image_path, list_text, list_label, list_ids = img_data
+        # img_data is a list of [list_image_path, list_text, list_exp_text, list_label, list_ids]
+        list_image_path, list_text, list_exp_text, list_label, list_ids = img_data
         self.image_path = list_image_path
         self.text = list_text  # you can tokenize everything at once in here(slow at the beginning), or tokenize it in the training loop.
+        self.exp_text = list_exp_text
         self.label = list_label
         self.list_ids = list_ids
         self.preprocess = preprocess
@@ -90,10 +111,11 @@ class image_text_dataset(Dataset):
         image["pixel_values"] = image["pixel_values"].squeeze()
 
         text = self.text[idx]
+        exp_text = self.exp_text[idx]
   
         label = self.label[idx]
         label = torch.tensor(label)
-        return image, text, label, self.list_ids[idx] 
+        return image, text, exp_text, label, self.list_ids[idx] 
 
 def get_values_from_gt(dataset, split):
     """
@@ -322,7 +344,8 @@ def get_values_from_gt(dataset, split):
                     
     else:
         raise ValueError("{} Dataset not supported".format(dataset))
-    return list_image_path, list_text, list_label, list_ids
+    list_exp_text = get_exp_text_from_gt(gt_df, len(list_text))
+    return list_image_path, list_text, list_exp_text, list_label, list_ids
 
 
 def get_img_ids(dataset, split):
@@ -398,7 +421,7 @@ def extract_clip_features(dataloader, device, model):
     CLS_text_features = []
     all_ids = []
     with torch.no_grad():
-        for images, texts, labels, ids in tqdm(dataloader):
+        for images, texts, exp_texts, labels, ids in tqdm(dataloader):
             # texts = clip.tokenize(texts,truncate=True)
             features = model.encode_image(images.to(device))
 
@@ -426,27 +449,35 @@ def extract_clip_features_HF(
     pooler_image_features = []
     all_labels = []
     all_text_features = []
+    all_exp_features = []
     pooler_text_features = []
+    pooler_exp_features = []
     all_ids = []
     with torch.no_grad():
-        for images, texts, labels, ids in tqdm(dataloader):
+        for images, texts, exp_texts, labels, ids in tqdm(dataloader):
             # texts = clip.tokenize(texts,truncate=True)
             # images = preprocess(images, return_tensors="pt")
             texts = tokenizer(texts, return_tensors="pt", padding=True, truncation=True)
+            exp_texts = tokenizer(exp_texts, return_tensors="pt", padding=True, truncation=True)
             features = vision_model(**images)
             text_features = text_model(**texts.to(device))
+            exp_features = text_model(**exp_texts.to(device))
             all_image_features.append(features.last_hidden_state.detach().cpu())
             pooler_image_features.append(features.pooler_output.detach().cpu())
             all_text_features.append(text_features.last_hidden_state.detach().cpu())
+            all_exp_features.append(exp_features.last_hidden_state.detach().cpu())
             pooler_text_features.append(text_features.pooler_output.detach().cpu())
+            pooler_exp_features.append(exp_features.pooler_output.detach().cpu())
             all_labels.append(labels)
             all_ids.append(ids)
 
     return (
         torch.cat(all_image_features),
         all_text_features,
+        all_exp_features,
         torch.cat(pooler_image_features),
         torch.cat(pooler_text_features),
+        torch.cat(pooler_exp_features),
         torch.cat(all_labels),
         all_ids,
     )

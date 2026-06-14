@@ -525,6 +525,7 @@ def main(args):
     # "ids" - the id of the sample
     # "image_feats"
     # "text_feats"
+    # "exp_feats"
     # "labels" - the label of the sample
 
     # Load the sparse retrieval dictionary if the path is not None
@@ -548,8 +549,10 @@ def main(args):
     #list(enumerate(train_dl))
     image_feat_dim = list(enumerate(train_dl))[0][1]["image_feats"].shape[1]
     text_feat_dim = list(enumerate(train_dl))[0][1]["text_feats"].shape[1]
+    exp_feat_dim = list(enumerate(train_dl))[0][1]["exp_feats"].shape[1]
     print("Image feature dimension: ", image_feat_dim)
     print("Text feature dimension: ", text_feat_dim)
+    print("Explanation feature dimension: ", exp_feat_dim)
 
     model = classifier_hateClipper(
         image_feat_dim, text_feat_dim, args.num_layers, args.proj_dim,

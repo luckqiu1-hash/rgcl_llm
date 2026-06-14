@@ -136,8 +136,10 @@ def main(args):
         (
             all_img_feats,
             all_text_feats,
+            all_exp_feats,
             pooler_img_feats,
             pooler_text_feats,
+            pooler_exp_feats,
             labels,
             ids,
         ) = extract_clip_features_HF(loader, device, Vision_model, Text_model, preprocess, tokenizer, args.all, args)
@@ -146,6 +148,7 @@ def main(args):
                 "ids": ids,
                 "img_feats": pooler_img_feats,
                 "text_feats": pooler_text_feats,
+                "exp_feats": pooler_exp_feats,
                 "labels": labels,
             },
             "{}/{}/{}_{}_HF.pt".format(
@@ -158,6 +161,7 @@ def main(args):
                     "ids": ids,
                     "img_feats": all_img_feats,
                     "text_feats": all_text_feats,
+                    "exp_feats": all_exp_feats,
                     "labels": labels,
                 },
                 "{}/{}/{}_{}_HF_All.pt".format(

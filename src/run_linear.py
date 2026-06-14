@@ -155,8 +155,10 @@ def main(args):
     image_feat_dim = list(enumerate(train_dl))[0][1]["image_feats"].shape[1]
     
     text_feat_dim = list(enumerate(train_dl))[0][1]["text_feats"].shape[1]
+    exp_feat_dim = list(enumerate(train_dl))[0][1]["exp_feats"].shape[1]
     print("Image feature dimension: ", image_feat_dim)
     print("Text feature dimension: ", text_feat_dim)
+    print("Explanation feature dimension: ", exp_feat_dim)
     model = classifier_hateClipper(image_feat_dim, text_feat_dim, args.num_layers, args.proj_dim,
                                    args.map_dim, args.fusion_mode, dropout=args.dropout, args=args)
     model.cuda()
@@ -195,10 +197,11 @@ def main(args):
             model.train()
             image_feats = batch["image_feats"].to(args.device)
             text_feats = batch["text_feats"].to(args.device)
+            exp_feats = batch["exp_feats"].to(args.device)
 
             labels = batch["labels"].to(args.device)
 
-            output = model(image_feats, text_feats)
+            output = model(image_feats, text_feats, exp_feats)
             # If labels is 1d, we need to unsqueeze it to 2d
             if len(labels.shape) == 1:
      

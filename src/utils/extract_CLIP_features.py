@@ -8,7 +8,7 @@ def extract_clip_features(dataloader, device, model):
     CLS_text_features = []
     all_ids = []
     with torch.no_grad():
-        for images, texts, labels, ids in tqdm(dataloader):
+        for images, texts, exp_texts, labels, ids in tqdm(dataloader):
             # texts = clip.tokenize(texts,truncate=True)
             features = model.encode_image(images.to(device))
 
@@ -35,37 +35,46 @@ def extract_clip_features_HF(
     if all:
         all_image_features = []
         all_text_features = []
+        all_exp_features = []
     else:
         all_image_features = [torch.zeros(1), torch.zeros(1)]
         all_text_features = torch.empty(3,3)
+        all_exp_features = torch.empty(3,3)
     pooler_image_features = []
     all_labels = []
     
     pooler_text_features = []
+    pooler_exp_features = []
     all_ids = []
     with torch.no_grad():
-        for images, texts, labels, ids in tqdm(dataloader):
+        for images, texts, exp_texts, labels, ids in tqdm(dataloader):
             # texts = clip.tokenize(texts,truncate=True)
             # images = preprocess(images, return_tensors="pt")
             #print(type(images), type(texts), type(labels), type(ids))
             #print(texts)
             texts = tokenizer(texts, return_tensors="pt", padding=True, truncation=True)
+            exp_texts = tokenizer(exp_texts, return_tensors="pt", padding=True, truncation=True)
             features = vision_model(**images)
             text_features = text_model(**texts.to(device))
+            exp_features = text_model(**exp_texts.to(device))
             if all:
                 all_image_features.append(features.last_hidden_state.detach().cpu())
                 all_text_features.append(text_features.last_hidden_state.detach().cpu())
+                all_exp_features.append(exp_features.last_hidden_state.detach().cpu())
             pooler_image_features.append(features.pooler_output.detach().cpu())
             
             pooler_text_features.append(text_features.pooler_output.detach().cpu())
+            pooler_exp_features.append(exp_features.pooler_output.detach().cpu())
             all_labels.append(labels)
             all_ids.append(ids)
 
     return (
         torch.cat(all_image_features),
         all_text_features,
+        all_exp_features,
         torch.cat(pooler_image_features),
         torch.cat(pooler_text_features),
+        torch.cat(pooler_exp_features),
         torch.cat(all_labels),
         all_ids,
     )

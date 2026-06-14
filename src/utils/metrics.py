@@ -141,10 +141,10 @@ def evaluate(test_dl, model, name="dev"):
         labels = np.array([])
         losses = np.array([])
         for step, batch in enumerate((test_dl)):
-            images, texts, label,_ = batch 
+            images, texts, exp_texts, label,_ = batch 
         
             #texts = clip.tokenize(texts,truncate=True)
-            predicted,_,_ = model(images, texts)
+            predicted,_,_ = model(images, texts, exp_texts)
             loss = lossFn_classifier(
                 predicted, label.reshape(-1, 1).to("cuda").type(torch.float32))
             losses = np.concatenate((losses, loss.reshape(-1).detach().cpu().numpy()))
@@ -386,13 +386,13 @@ def iterate_dl(args, dl, classifier):
             ids.extend(batch["ids"])
             if step == 0:
                 labels = batch["labels"].detach().cpu()
-                predicted, embed = classifier(batch["image_feats"].to(args.device),batch["text_feats"].to(args.device), return_embed=True)
+                predicted, embed = classifier(batch["image_feats"].to(args.device), batch["text_feats"].to(args.device), batch["exp_feats"].to(args.device), return_embed=True)
                 predicted = predicted.detach().cpu()
                 embed = embed.detach().cpu()
                 
             else:
                 labels = torch.cat((labels, batch["labels"].detach().cpu()), dim=0)
-                new_pred, new_embed = classifier(batch["image_feats"].to(args.device),batch["text_feats"].to(args.device), return_embed=True)
+                new_pred, new_embed = classifier(batch["image_feats"].to(args.device), batch["text_feats"].to(args.device), batch["exp_feats"].to(args.device), return_embed=True)
                 predicted = torch.cat((predicted, new_pred.detach().cpu() ), dim=0)
                 embed = torch.cat((embed, new_embed.detach().cpu() ), dim=0)
     return ids, labels, predicted, embed
@@ -602,13 +602,13 @@ def iterate_dl_(dl, classifier, ids_eval=None):
             ids.extend(batch["ids"])
             if step == 0:
                 labels = batch["labels"].detach().cpu()
-                predicted, embed = classifier(batch["image_feats"].to("cuda"),batch["text_feats"].to("cuda"), return_embed=True)
+                predicted, embed = classifier(batch["image_feats"].to("cuda"), batch["text_feats"].to("cuda"), batch["exp_feats"].to("cuda"), return_embed=True)
                 predicted = predicted.detach().cpu()
                 embed = embed.detach().cpu()
                 
             else:
                 labels = torch.cat((labels, batch["labels"].detach().cpu()), dim=0)
-                new_pred, new_embed = classifier(batch["image_feats"].to("cuda"),batch["text_feats"].to("cuda"), return_embed=True)
+                new_pred, new_embed = classifier(batch["image_feats"].to("cuda"), batch["text_feats"].to("cuda"), batch["exp_feats"].to("cuda"), return_embed=True)
                 predicted = torch.cat((predicted, new_pred.detach().cpu() ), dim=0)
                 embed = torch.cat((embed, new_embed.detach().cpu() ), dim=0)
     
