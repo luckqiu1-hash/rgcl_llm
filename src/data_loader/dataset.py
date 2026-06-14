@@ -468,7 +468,7 @@ def load_feats_from_CLIP(path, dataset, model, all=False):
     if dataset == "FB":
         """
         load the features for FB dataset, which contains train, dev, test_seen, test_unseen sets
-        each sets contains ids, img_feats, text_feats, labels
+        each sets contains ids, img_feats, text_feats, exp_feats, labels
         """
         train, dev, test_seen, test_unseen = load_feats_FB(path, model)
         
@@ -514,19 +514,21 @@ def concate_all_splits_FB(train, dev, test_seen, test_unseen):
     This function takes all the splits and concate them into one whole dataset
     to test the number of unique images in the whole dataset
     """
-    train_ids, train_img_feats, train_text_feats, train_labels = train
-    dev_ids, dev_img_feats, dev_text_feats, dev_labels = dev
+    train_ids, train_img_feats, train_text_feats, train_exp_feats, train_labels = train
+    dev_ids, dev_img_feats, dev_text_feats, dev_exp_feats, dev_labels = dev
     (
         test_seen_ids,
 
         test_seen_img_feats,
         test_seen_text_feats,
+        test_seen_exp_feats,
         test_seen_labels,
     ) = test_seen
     (
         test_unseen_ids,
         test_unseen_img_feats,
         test_unseen_text_feats,
+        test_unseen_exp_feats,
         test_unseen_labels,
     ) = test_unseen
     all_ids = train_ids + dev_ids + test_seen_ids + test_unseen_ids
@@ -543,10 +545,19 @@ def concate_all_splits_FB(train, dev, test_seen, test_unseen):
         ),
         dim=0,
     )
+    all_exp_feats = torch.cat(
+        (
+            train_exp_feats,
+            dev_exp_feats,
+            test_seen_exp_feats,
+            test_unseen_exp_feats,
+        ),
+        dim=0,
+    )
     all_labels = torch.cat(
         (train_labels, dev_labels, test_seen_labels, test_unseen_labels), dim=0
     )
-    return [all_ids,  all_img_feats, all_text_feats, all_labels]
+    return [all_ids,  all_img_feats, all_text_feats, all_exp_feats, all_labels]
 
 
 def load_feats_split(path, dataset=None):
@@ -557,6 +568,7 @@ def load_feats_split(path, dataset=None):
         ids_dics: maps the image ids to the order of the image
         img_feats: the features extracted by CLIP model
         text_feats: the features extracted by CLIP model
+        exp_feats: the features extracted from explanation text
         labels: ground truth labels
     The features are extracted and defined in generate_CLIP_embedding.py
     """
@@ -572,6 +584,7 @@ def load_feats_split(path, dataset=None):
 
     img_feats = dict["img_feats"]
     text_feats = dict["text_feats"]
+    exp_feats = dict["exp_feats"]
     labels = dict["labels"]
 
     if dataset == "MMHS":
@@ -581,7 +594,7 @@ def load_feats_split(path, dataset=None):
 
                 labels[index] = 1
 
-    return [ids, img_feats, text_feats, labels]
+    return [ids, img_feats, text_feats, exp_feats, labels]
 
 def load_feats_FB(path, model):
     dataset = "FB"

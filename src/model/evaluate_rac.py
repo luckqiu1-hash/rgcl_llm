@@ -25,7 +25,7 @@ def iterate_dl(args, dl, classifier):
             if step == 0:
                 labels = batch["labels"].detach().cpu()
                 predicted, embed = classifier(batch["image_feats"].to(
-                    args.device), batch["text_feats"].to(args.device), return_embed=True)
+                    args.device), batch["text_feats"].to(args.device), batch["exp_feats"].to(args.device), return_embed=True)
                 predicted = predicted.detach().cpu()
                 embed = embed.detach().cpu()
 
@@ -33,7 +33,7 @@ def iterate_dl(args, dl, classifier):
                 labels = torch.cat(
                     (labels, batch["labels"].detach().cpu()), dim=0)
                 new_pred, new_embed = classifier(batch["image_feats"].to(
-                    args.device), batch["text_feats"].to(args.device), return_embed=True)
+                    args.device), batch["text_feats"].to(args.device), batch["exp_feats"].to(args.device), return_embed=True)
                 predicted = torch.cat(
                     (predicted, new_pred.detach().cpu()), dim=0)
                 embed = torch.cat((embed, new_embed.detach().cpu()), dim=0)
@@ -59,7 +59,7 @@ def retrieve_evaluate_RAC(
     for i, batch in enumerate(train_dl):
         train_ids.extend(batch["ids"])
         _, all_feats = model(batch["image_feats"].to(
-            args.device), batch["text_feats"].to(args.device), return_embed=True)
+            args.device), batch["text_feats"].to(args.device), batch["exp_feats"].to(args.device), return_embed=True)
         if i == 0:
             if args.Faiss_GPU:
                 train_feats = all_feats
@@ -93,7 +93,7 @@ def retrieve_evaluate_RAC(
     for i, batch in enumerate(evaluate_dl):
         evaluate_ids.extend(batch["ids"])
         _, all_feats = model(batch["image_feats"].to(
-            args.device), batch["text_feats"].to(args.device), return_embed=True)
+            args.device), batch["text_feats"].to(args.device), batch["exp_feats"].to(args.device), return_embed=True)
         if i == 0:
 
             if args.Faiss_GPU:
@@ -320,7 +320,7 @@ def retrieve_evaluate_RAC_(
     for i, batch in enumerate(train_dl):
         train_ids.extend(batch["ids"])
         out, all_feats = model(batch["image_feats"].to(
-            'cuda'), batch["text_feats"].to('cuda'), return_embed=True)
+            'cuda'), batch["text_feats"].to('cuda'), batch["exp_feats"].to('cuda'), return_embed=True)
         if i == 0:
 
             train_feats = all_feats
@@ -339,7 +339,7 @@ def retrieve_evaluate_RAC_(
             for batch in train_dl_:
                 train_ids.extend(batch["ids"])
                 out, all_feats = model(batch["image_feats"].to(
-                    'cuda'), batch["text_feats"].to('cuda'), return_embed=True)
+                    'cuda'), batch["text_feats"].to('cuda'), batch["exp_feats"].to('cuda'), return_embed=True)
 
                 # For GPU implementation
                 train_feats = torch.cat((train_feats, all_feats), dim=0)
@@ -356,7 +356,7 @@ def retrieve_evaluate_RAC_(
     for i, batch in enumerate(evaluate_dl):
         evaluate_ids.extend(batch["ids"])
         out, all_feats = model(batch["image_feats"].to(
-            'cuda'), batch["text_feats"].to('cuda'), return_embed=True)
+            'cuda'), batch["text_feats"].to('cuda'), batch["exp_feats"].to('cuda'), return_embed=True)
         if i == 0:
 
             evaluate_feats = all_feats

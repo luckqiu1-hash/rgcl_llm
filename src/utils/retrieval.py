@@ -12,7 +12,7 @@ from tqdm import tqdm
 # Given the dense vectors of the image and text,
 # we retrieve the top k image and text MM pairs
 def retrieve_topk(
-    database, query, alpha=1.0, beta=1.0, largest_retrieval=100, threshold=0.2
+    database, query, alpha=1.0, beta=1.0, gamma=1.0, largest_retrieval=100, threshold=0.2
 ):
     """
     This function retrieve the top k image and text MM pairs for val/test
@@ -32,23 +32,27 @@ def retrieve_topk(
 
     """
 
-    ids,  img_feats, text_feats, labels = database
-    q_ids, q_img_feats, q_text_feats, q_labels = query
+    ids, img_feats, text_feats, exp_feats, labels = database
+    q_ids, q_img_feats, q_text_feats, q_exp_feats, q_labels = query
 
     # Normalize the features
     img_feats_norm = img_feats.cpu().numpy().astype("float32")
     faiss.normalize_L2(img_feats_norm)
     text_feats_norm = text_feats.cpu().numpy().astype("float32")
     faiss.normalize_L2(text_feats_norm)
+    exp_feats_norm = exp_feats.cpu().numpy().astype("float32")
+    faiss.normalize_L2(exp_feats_norm)
 
     q_img_feats_norm = q_img_feats.cpu().numpy().astype("float32")
     faiss.normalize_L2(q_img_feats_norm)
     q_text_feats_norm = q_text_feats.cpu().numpy().astype("float32")
     faiss.normalize_L2(q_text_feats_norm)
+    q_exp_feats_norm = q_exp_feats.cpu().numpy().astype("float32")
+    faiss.normalize_L2(q_exp_feats_norm)
     feats = np.concatenate(
-        (alpha * img_feats_norm, beta * text_feats_norm), axis=1)
+        (alpha * img_feats_norm, beta * text_feats_norm, gamma * exp_feats_norm), axis=1)
     q_feats = np.concatenate(
-        (alpha * q_img_feats_norm, beta * q_text_feats_norm), axis=1
+        (alpha * q_img_feats_norm, beta * q_text_feats_norm, gamma * q_exp_feats_norm), axis=1
     )
 
     # Get the dimension of the features
@@ -332,8 +336,9 @@ def dense_retrieve_hard_negatives_pseudo_positive(
         for i, batch in enumerate(train_dl):
             image_feats = batch["image_feats"].to(args.device)
             text_feats = batch["text_feats"].to(args.device)
+            exp_feats = batch["exp_feats"].to(args.device)
             # Image+Text features after modality fusion
-            _, all_feats = model(image_feats, text_feats, return_embed=True)
+            _, all_feats = model(image_feats, text_feats, exp_feats, return_embed=True)
             if i == 0:
 
                 if args.Faiss_GPU:
@@ -504,6 +509,7 @@ def sparse_retrieve_hard_negatives_pseudo_positive(
     # Train_len * feats
     all_img_features = train_set.image_feats
     all_text_features = train_set.text_feats
+    all_exp_features = train_set.exp_feats
     all_labels = train_set.labels
     batch_size = len(ids)
     hard_negative_features = torch.zeros(
@@ -551,6 +557,8 @@ def sparse_retrieve_hard_negatives_pseudo_positive(
                         args.device).unsqueeze(0),
                     all_text_features[index_trainset].to(
                         args.device).unsqueeze(0),
+                    all_exp_features[index_trainset].to(
+                        args.device).unsqueeze(0),
                     return_embed=True
                 )
                 pseudo_positive_features[index_batch][pseudo_positive_counter] = encoded_feature_x
@@ -561,6 +569,8 @@ def sparse_retrieve_hard_negatives_pseudo_positive(
                     all_img_features[index_trainset].to(
                         args.device).unsqueeze(0),
                     all_text_features[index_trainset].to(
+                        args.device).unsqueeze(0),
+                    all_exp_features[index_trainset].to(
                         args.device).unsqueeze(0),
                     return_embed=True
                 )
