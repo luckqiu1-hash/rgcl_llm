@@ -10,6 +10,7 @@ import numpy as np
 from src.data_loader.feature_loader import get_attrobj_from_ids
 from sklearn.preprocessing import MultiLabelBinarizer
 import re
+import os
 """
 For linear probe/fine tune/zero-shot
 """
@@ -19,19 +20,50 @@ EXP_TEXT_COLUMNS = [
     "explanation",
     "explanation_text",
     "explain_text",
+    "context",
     "rationale",
     "reason",
     "reasoning",
 ]
 
+CONTEXT_FILES_BY_DATASET = {
+    "Toxicn_mm": "./data/context/Toxic_context.jsonl",
+}
 
-def get_exp_text_from_gt(gt_df, length):
+
+def normalize_exp_text(item):
+    return " " if item is None or pd.isna(item) else str(item)
+
+
+def load_context_text_by_id(dataset):
+    context_file = CONTEXT_FILES_BY_DATASET.get(dataset)
+    if context_file is None or not os.path.exists(context_file):
+        return {}
+
+    context_df = pd.read_json(context_file, lines=True, dtype=False)
+    if "id" not in context_df.columns:
+        return {}
+
+    for column in EXP_TEXT_COLUMNS:
+        if column in context_df.columns:
+            return {
+                str(row["id"]): normalize_exp_text(row[column])
+                for _, row in context_df.iterrows()
+            }
+    return {}
+
+
+def get_exp_text_from_gt(gt_df, length, dataset=None, ids=None):
     if gt_df is None:
         return [" "] * length
     for column in EXP_TEXT_COLUMNS:
         if column in gt_df.columns:
             exp_text = gt_df[column].to_list()
-            return [" " if item is None or pd.isna(item) else str(item) for item in exp_text]
+            return [normalize_exp_text(item) for item in exp_text]
+    if dataset is not None and ids is not None:
+        context_text_by_id = load_context_text_by_id(dataset)
+        if context_text_by_id:
+            return [context_text_by_id.get(str(item), " ") for item in ids]
     return [" "] * length
 
 
@@ -344,7 +376,7 @@ def get_values_from_gt(dataset, split):
                     
     else:
         raise ValueError("{} Dataset not supported".format(dataset))
-    list_exp_text = get_exp_text_from_gt(gt_df, len(list_text))
+    list_exp_text = get_exp_text_from_gt(gt_df, len(list_text), dataset, list_ids)
     return list_image_path, list_text, list_exp_text, list_label, list_ids
 
 
