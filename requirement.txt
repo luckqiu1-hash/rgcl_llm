@@ -1,0 +1,13 @@
+#python==3.10
+#pytorch 
+#faiss-gpu
+transformers
+matplotlib
+tqdm
+wandb
+pandas
+argparse
+scikit-learn 
+torchmetrics>=1.0
+easydict
+rank_bm25

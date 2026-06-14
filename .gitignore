@@ -1,0 +1,15 @@
+data
+*.pyc
+*.ipynb
+wandb
+*.pt 
+*.pth
+DPR
+logging
+.vscode/
+test
+artifacts
+*.out
+log_toxicn_mm
+log
+clip_model
