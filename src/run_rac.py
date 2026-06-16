@@ -22,9 +22,9 @@ def parse_args():
 
     # <----------------- Data Configs ----------------->
     arg_parser.add_argument(
-        "--path", type=str, default="E:\qxy\code\RGCL-main\src\data/")
+        "--path", type=str, default="E:\qxy\code\\rgcl_llm\src\data/")
     arg_parser.add_argument(
-        "--output_path", type=str, default="E:\qxy\code\RGCL-main\src\log_toxicn_mm/"
+        "--output_path", type=str, default="E:\qxy\code\\rgcl_llm\src\log_toxicn_mm/"
     )
     arg_parser.add_argument("--model", type=str, default="")
 
@@ -392,7 +392,7 @@ pre: {:.4f} recall: {:.4f} f1: {:.4f}".format(
         print(" ")
         # Save the model if the val criterion is the best so far
 
-        with open("E:\qxy\code\RGCL-main\src/log_toxicn_mm.txt", "a", encoding="utf-8") as f:
+        with open("E:\qxy\code\\rgcl_llm\src/log_toxicn_mm.txt", "a", encoding="utf-8") as f:
             # 写入Test指标
             test_line = "Test Epoch {} val_acc: {:.4f} val_roc: {:.4f} test_acc: {:.4f} test_roc: {:.4f}\n".format(
                 epoch, acc_, roc_, test_acc_, test_roc_
@@ -426,7 +426,7 @@ pre: {:.4f} recall: {:.4f} f1: {:.4f}".format(
                 args.output_path +
                 "/ckpt/last_model_{}_{}.pt".format(epoch, test_acc_)
             )
-    with open("E:\qxy\code\RGCL-main\src/log_toxicn_mm.txt", "a", encoding="utf-8") as f:
+    with open("E:\qxy\code\\rgcl_llm\src/log_toxicn_mm.txt", "a", encoding="utf-8") as f:
         best_line = f"best_epoch:{best_epoch}       best_acc:{best_acc}"
         f.write(best_line)
     return model, best_epoch_path

@@ -53,14 +53,14 @@ def parse_args_sys(args_list=None):
     arg_parser.add_argument(
         "--EXP_FOLDER",
         type=str,
-        default="E:\qxy\code\RGCL-main\src\data\CLIP_Embedding",
+        default="E:\qxy\code\\rgcl_llm\src\data\CLIP_Embedding",
         help="The path to save results.",
     )
     arg_parser.add_argument(
         "--model",
         type=str,
         # default="kakaobrain/align-base",
-        default="E:\qxy\code\RGCL-main\src\pretrain\\align-base",
+        default="E:\qxy\code\\rgcl_llm\src\pretrain\\align-base",
         help="The align model to use",
     )
     arg_parser.add_argument(

@@ -157,7 +157,7 @@ def get_values_from_gt(dataset, split):
     """
     # Read the ground truth file
     if dataset != "MultiOFF" and "Memotion" not in dataset:
-        gt_file = "E:\qxy\code\RGCL-main\src\data\gt/" + dataset + "/" + split + ".jsonl"
+        gt_file = "E:\qxy\code\\rgcl_llm\src\data\gt/" + dataset + "/" + split + ".jsonl"
         gt_df = pd.read_json(gt_file, lines=True, dtype=False)
 
         # Get the ordered list of image ids
@@ -175,7 +175,7 @@ def get_values_from_gt(dataset, split):
     if dataset == "FB":
         list_label = gt_df["label"].to_list()
         for img_id in list_ids:
-            list_image_path.append("E:\qxy\code\RGCL-main\src\data\image/" + dataset + "/All/" + img_id + ".png")
+            list_image_path.append("E:\qxy\code\\rgcl_llm\src\data\image/" + dataset + "/All/" + img_id + ".png")
     elif dataset == "HarMeme" or dataset == "HarmP":
         print(dataset)
         list_label = gt_df["labels"]
@@ -188,7 +188,7 @@ def get_values_from_gt(dataset, split):
         assert len(list_label_converted) == len(list_label)
         list_label = list_label_converted
         for img_id in list_ids:
-            list_image_path.append(".E:\qxy\code\RGCL-main\src\data\image/" + dataset + "/All/" + img_id + ".png")
+            list_image_path.append("E:\qxy\code\\rgcl_llm\src\data\image/" + dataset + "/All/" + img_id + ".png")
     elif dataset == "HarmC" :
         # The HarmC is the same as HarMeme, but here we refer to 3 classes
         # 0: not harmful, 1: 
@@ -204,7 +204,7 @@ def get_values_from_gt(dataset, split):
         assert len(list_label_converted) == len(list_label)
         list_label = list_label_converted
         for img_id in list_ids:
-            list_image_path.append("E:\qxy\code\RGCL-main\src\data\image/" + dataset + "/All/" + img_id + ".png")
+            list_image_path.append("E:\qxy\code\\rgcl_llm\src\data\image/" + dataset + "/All/" + img_id + ".png")
     elif dataset == "Propaganda":
         #list_label = gt_df["label"].to_list()
         list_image = gt_df["image"].to_list()
@@ -265,7 +265,7 @@ def get_values_from_gt(dataset, split):
     elif dataset=='Toxicn_mm':
         list_label = gt_df["label"].to_list()
         for img_id in list_ids:
-            list_image_path.append("E:\qxy\code\RGCL-main\src\data\image/" + dataset + '/' + img_id + ".jpg")
+            list_image_path.append("E:\qxy\code\\rgcl_llm\src\data\image/" + dataset + '/' + img_id + ".jpg")
     elif "Memotion" in dataset:
         # Humour, Sarcasm, Offense, Motivation
         if split == "train":
@@ -384,7 +384,7 @@ def get_img_ids(dataset, split):
     """
     get ordered image ids from gt files
     """
-    gt_file = "E:\qxy\code\RGCL-main\src\data\gt/" + dataset + "/" + split + ".jsonl"
+    gt_file = "E:\qxy\code\\rgcl_llm\src\data\gt/" + dataset + "/" + split + ".jsonl"
     gt_df = pd.read_json(gt_file, lines=True, dtype=False)
     list_ids = gt_df["id"].values
     return list_ids

@@ -24,7 +24,7 @@ def parse_args_sys(args_list=None):
     arg_parser.add_argument(
         "--EXP_FOLDER",
         type=str,
-        default="E:\qxy\code\RGCL-main\src\data\CLIP_Embedding",
+        default="E:\qxy\code\\rgcl_llm\src\data\CLIP_Embedding",
         help="The path to save results.",
     )
     arg_parser.add_argument(
@@ -48,7 +48,7 @@ def main(args):
     if os.path.exists("{}/{}".format(args.EXP_FOLDER, args.dataset)) == False:
         os.makedirs("{}/{}".format(args.EXP_FOLDER, args.dataset))
 
-    local_model_path = 'E:\qxy\code\RGCL-main\src\clip_model\clip-vit-large-patch14-336'
+    local_model_path = 'E:\qxy\code\\rgcl_llm\src\clip_model\clip-vit-large-patch14-336'
 
     # Load the CLIP model
     Vision_model = CLIPVisionModel.from_pretrained(local_model_path,local_files_only=True)
@@ -119,6 +119,9 @@ def main(args):
             labels,
             ids,
         ) = extract_clip_features_HF(loader, device, Vision_model, Text_model, preprocess, tokenizer, args.all)
+        save_path = "{}/{}/{}_{}_HF.pt".format(
+            args.EXP_FOLDER, args.dataset, name, str(args.model).replace("/", "_")
+        )
         torch.save(
             {
                 "ids": ids,
@@ -127,10 +130,14 @@ def main(args):
                 "exp_feats": pooler_exp_feats,
                 "labels": labels,
             },
-            "{}/{}/{}_{}_HF.pt".format(
-                args.EXP_FOLDER, args.dataset, name, str(args.model).replace("/", "_")
-            ),
+            save_path,
         )
+
+        print("saved path repr:", repr(save_path))
+        print("absolute path:", os.path.abspath(save_path))
+        print("exists:", os.path.exists(save_path))
+        print("file size:", os.path.getsize(save_path) if os.path.exists(save_path) else "NOT FOUND")
+
         if args.all:
             torch.save(
                 {
