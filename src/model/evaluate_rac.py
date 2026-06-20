@@ -317,23 +317,24 @@ def retrieve_evaluate_RAC_(
         train_dl_is_list = True
     else:
         train_dl_is_list = False
-    for i, batch in enumerate(train_dl):
-        train_ids.extend(batch["ids"])
-        out, all_feats = model(batch["image_feats"].to(
-            'cuda'), batch["text_feats"].to('cuda'), batch["exp_feats"].to('cuda'), return_embed=True)
-        if i == 0:
+    with torch.no_grad():
+        for i, batch in enumerate(train_dl):
+            train_ids.extend(batch["ids"])
+            out, all_feats = model(batch["image_feats"].to(
+                'cuda'), batch["text_feats"].to('cuda'), batch["exp_feats"].to('cuda'), return_embed=True)
+            if i == 0:
 
-            train_feats = all_feats
-            train_labels = batch["labels"]
-            train_out = out
-        else:
+                train_feats = all_feats
+                train_labels = batch["labels"]
+                train_out = out
+            else:
 
 
-            # For GPU implementation
-            train_feats = torch.cat((train_feats, all_feats), dim=0)
-            train_labels = torch.cat(
-                (train_labels, batch["labels"]), dim=0)
-            train_out = torch.cat((train_out, out), dim=0)
+                # For GPU implementation
+                train_feats = torch.cat((train_feats, all_feats), dim=0)
+                train_labels = torch.cat(
+                    (train_labels, batch["labels"]), dim=0)
+                train_out = torch.cat((train_out, out), dim=0)
     if train_dl_is_list:
         for train_dl_ in train_dl_rest:
             for batch in train_dl_:
@@ -353,21 +354,22 @@ def retrieve_evaluate_RAC_(
     evaluate_ids = []
     evaluate_feats = np.array([[]])
     evaluate_labels = np.array([[]])
-    for i, batch in enumerate(evaluate_dl):
-        evaluate_ids.extend(batch["ids"])
-        out, all_feats = model(batch["image_feats"].to(
-            'cuda'), batch["text_feats"].to('cuda'), batch["exp_feats"].to('cuda'), return_embed=True)
-        if i == 0:
+    with torch.no_grad():
+        for i, batch in enumerate(evaluate_dl):
+            evaluate_ids.extend(batch["ids"])
+            out, all_feats = model(batch["image_feats"].to(
+                'cuda'), batch["text_feats"].to('cuda'), batch["exp_feats"].to('cuda'), return_embed=True)
+            if i == 0:
 
-            evaluate_feats = all_feats
-            evaluate_labels = batch["labels"]
-            eval_out = out
-        else:
+                evaluate_feats = all_feats
+                evaluate_labels = batch["labels"]
+                eval_out = out
+            else:
 
-            evaluate_feats = torch.cat((evaluate_feats, all_feats), dim=0)
-            evaluate_labels = torch.cat(
-                (evaluate_labels, batch["labels"]), dim=0)
-            eval_out = torch.cat((eval_out, out), dim=0)
+                evaluate_feats = torch.cat((evaluate_feats, all_feats), dim=0)
+                evaluate_labels = torch.cat(
+                    (evaluate_labels, batch["labels"]), dim=0)
+                eval_out = torch.cat((eval_out, out), dim=0)
 
     # Get the dimension of the features
     dim = all_feats.shape[1]

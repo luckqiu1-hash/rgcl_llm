@@ -397,13 +397,42 @@ def iterate_dl(args, dl, classifier):
                 embed = torch.cat((embed, new_embed.detach().cpu() ), dim=0)
     return ids, labels, predicted, embed
 
+def find_best_threshold(probs, labels):
+    """
+    probs: sigmoid 后的概率, shape [N] / [N, 1] / [N, C]
+    labels: 真实标签, shape 同 probs
+    """
+    if len(labels.shape) == 1:
+        labels = labels.unsqueeze(1)
+
+    if len(probs.shape) == 1:
+        probs = probs.unsqueeze(1)
+
+    labels = labels.long()
+
+    best_threshold = 0.5
+    best_acc = -1.0
+
+    thresholds = torch.arange(0.01, 1.00, 0.01, device=probs.device)
+
+    for threshold in thresholds:
+        preds = (probs >= threshold).long()
+
+        acc = (preds == labels).float().mean().item()
+
+        if acc > best_acc:
+            best_acc = acc
+            best_threshold = threshold.item()
+
+    return best_threshold, best_acc
 
 def eval_metrics(args, labels, predicted, name="dev_seen", epoch=0, compute_loss=True, print_score=True):
     if len(labels.shape) == 1:
         labels = labels.unsqueeze(1)
     
     preds_proxy = torch.sigmoid(predicted)
-    preds = (preds_proxy >= 0.5).long()
+    best_threshold ,_= find_best_threshold(preds_proxy, labels)
+    preds = (preds_proxy >= best_threshold).long()
     
     if args.dataset == "MMHS-FineGrained":
         ACCURACY = torchmetrics.Accuracy()
