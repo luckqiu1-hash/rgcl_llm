@@ -29,3 +29,6 @@ Test Epoch 27 val_acc: 0.7808 val_roc: 0.8093 test_acc: 0.7808 test_roc: 0.8093
 Test Epoch 28 val_acc: 0.7504 val_roc: 0.8094 test_acc: 0.7504 test_roc: 0.8094
 Test Epoch 29 val_acc: 0.7796 val_roc: 0.8168 test_acc: 0.7796 test_roc: 0.8168
 best_epoch:11       best_acc:0.7945833206176758
+Test Epoch 0 val_acc: 0.7583 val_roc: 0.8111 test_acc: 0.7583 test_roc: 0.8111
+Test Epoch 1 val_acc: 0.7862 val_roc: 0.8189 test_acc: 0.7862 test_roc: 0.8189
+Test Epoch 2 val_acc: 0.7771 val_roc: 0.8310 test_acc: 0.7771 test_roc: 0.8310

@@ -554,9 +554,21 @@ def main(args):
     print("Text feature dimension: ", text_feat_dim)
     print("Explanation feature dimension: ", exp_feat_dim)
 
+    # model = classifier_hateClipper(
+    #     image_feat_dim, text_feat_dim, args.num_layers, args.proj_dim,
+    #     args.map_dim, args.fusion_mode, dropout=args.dropout, batch_norm=args.batch_norm, args=args)
     model = classifier_hateClipper(
-        image_feat_dim, text_feat_dim, args.num_layers, args.proj_dim,
-        args.map_dim, args.fusion_mode, dropout=args.dropout, batch_norm=args.batch_norm, args=args)
+        image_dim=image_feat_dim,
+        text_dim=text_feat_dim,
+        exp_dim=text_feat_dim,
+        num_layers=args.num_layers,
+        proj_dim=args.proj_dim,
+        map_dim=args.map_dim,
+        fusion_mode=args.fusion_mode,
+        dropout=args.dropout,
+        batch_norm=args.batch_norm,
+        args=args,
+    )
     model.to(args.device)
     print(model)
     # evaluate_split(train, dev, "dev")

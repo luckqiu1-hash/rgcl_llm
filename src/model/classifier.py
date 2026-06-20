@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class classifier_hateClipper_llm(nn.Module):
+class classifier_hateClipper(nn.Module):
     """
     Pruned classifier_hateClipper_llm for the current training setup:
       - dataset: FB -> binary output only
@@ -29,7 +29,7 @@ class classifier_hateClipper_llm(nn.Module):
         batch_norm=False,
         args=None,
     ) -> None:
-        super(classifier_hateClipper_llm, self).__init__()
+        super(classifier_hateClipper, self).__init__()
 
         if dropout is None:
             dropout = [0.1, 0.1, 0.1]
@@ -37,7 +37,7 @@ class classifier_hateClipper_llm(nn.Module):
             raise ValueError("dropout must contain three values: [input_drop, fusion_drop, head_drop]")
         if batch_norm:
             raise ValueError("This pruned FB LLM classifier assumes --batch_norm False.")
-        if args is not None and hasattr(args, "dataset") and args.dataset != "FB":
+        if args is not None and hasattr(args, "dataset") and args.dataset != "Toxicn_mm":
             raise ValueError("This pruned classifier is specialized for --dataset FB.")
 
         self.map_dim = map_dim
