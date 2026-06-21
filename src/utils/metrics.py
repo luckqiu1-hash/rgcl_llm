@@ -210,6 +210,33 @@ def compute_metrics_retrieval_baseline(logging_dict, labels, majority_voting="me
     #print("AUROC:", roc)
     return acc, roc, pre, recall, f1
 
+import numpy as np
+from sklearn.metrics import accuracy_score
+
+
+def find_best_acc_threshold(scores, labels):
+    """
+    scores: probability scores, shape [N], usually after sigmoid
+    labels: binary labels, shape [N]
+    """
+    scores = np.asarray(scores).reshape(-1)
+    labels = np.asarray(labels).astype(int).reshape(-1)
+
+    # 用所有唯一分数作为候选阈值，比 linspace 更精确
+    thresholds = np.unique(scores)
+
+    best_thr = 0.5
+    best_acc = -1.0
+
+    for thr in thresholds:
+        preds = (scores >= thr).astype(int)
+        acc = accuracy_score(labels, preds)
+
+        if acc > best_acc:
+            best_acc = acc
+            best_thr = thr
+
+    return best_thr, best_acc
 
 def compute_metrics_retrieval(logging_dict, labels, majority_voting="mean", topk=0, use_prob=False, use_sim=False):
     """
@@ -289,7 +316,10 @@ def compute_metrics_retrieval(logging_dict, labels, majority_voting="mean", topk
     if not use_sim:
         list_majority_voted_round = (np.array(list_majority_voted)>=0.5)*1
     else:
-        list_majority_voted_round = (sigmoid(np.array(list_majority_voted))>=0.5)*1
+        # list_majority_voted_round = (sigmoid(np.array(list_majority_voted))>=0.5)*1
+        scores_for_cls = sigmoid(np.array(list_majority_voted))
+    best_thr, best_acc = find_best_acc_threshold(scores_for_cls, labels)
+    list_majority_voted_round = (scores_for_cls >= best_thr).astype(int)
     acc = np.mean(list_majority_voted_round == labels)
     pre = precision_score(labels, list_majority_voted_round)
     recall = recall_score(labels, list_majority_voted_round)

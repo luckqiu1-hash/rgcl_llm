@@ -503,83 +503,7 @@ class SourceStyleSalM2MODAFusion(nn.Module):
 
         return out
 
-class ResidualMLPBlock(nn.Module):
-    def __init__(self, dim, dropout=0.1):
-        super().__init__()
 
-        self.norm = nn.LayerNorm(dim)
-        self.ffn = nn.Sequential(
-            nn.Linear(dim, dim * 2),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(dim * 2, dim),
-            nn.Dropout(dropout),
-        )
-
-        self.alpha = nn.Parameter(torch.tensor(0.1))
-
-    def forward(self, x):
-        return x + torch.tanh(self.alpha) * self.ffn(self.norm(x))
-
-
-class ResidualClassificationHead(nn.Module):
-    def __init__(self, in_dim, proj_dim, num_layers, dropout=0.1):
-        super().__init__()
-
-        if num_layers <= 0:
-            self.input_proj = nn.Identity()
-            self.blocks = nn.ModuleList()
-            self.out_dim = in_dim
-        else:
-            self.input_proj = nn.Sequential(
-                nn.Linear(in_dim, proj_dim),
-                nn.LayerNorm(proj_dim),
-                nn.GELU(),
-                nn.Dropout(dropout),
-            )
-
-            self.blocks = nn.ModuleList(
-                [
-                    ResidualMLPBlock(proj_dim, dropout)
-                    for _ in range(max(0, num_layers - 1))
-                ]
-            )
-
-            self.out_dim = proj_dim
-
-    def forward(self, x):
-        x = self.input_proj(x)
-
-        for block in self.blocks:
-            x = block(x)
-
-        return x
-
-
-class CosineBinaryClassifier(nn.Module):
-    """
-    Binary cosine classifier.
-
-    适合 retrieval embedding 已经比较强的情况。
-    输出仍然是 logit，可以继续配合 BCEWithLogitsLoss 使用。
-    """
-
-    def __init__(self, dim, scale=16.0):
-        super().__init__()
-
-        self.weight = nn.Parameter(torch.empty(1, dim))
-        self.bias = nn.Parameter(torch.zeros(1))
-        self.log_scale = nn.Parameter(torch.log(torch.tensor(float(scale))))
-
-        nn.init.normal_(self.weight, mean=0.0, std=0.02)
-
-    def forward(self, x):
-        x = F.normalize(x, dim=-1)
-        w = F.normalize(self.weight, dim=-1)
-
-        scale = torch.exp(self.log_scale).clamp(1.0, 100.0)
-
-        return scale * F.linear(x, w, self.bias)
 
 class classifier_hateClipper(nn.Module):
     """
@@ -717,42 +641,24 @@ class classifier_hateClipper(nn.Module):
         self.layer_combine_ln = nn.LayerNorm(base_dim)
 
         # ========= 7. Classification head =========
-        # if num_layers <= 0:
-        #     self.mlp = nn.Identity()
-        #     final_dim = base_dim
-        # else:
-        #     layers = []
-        #     cur_dim = base_dim
-        #     for _ in range(num_layers):
-        #         layers.append(nn.Linear(cur_dim, proj_dim))
-        #         layers.append(nn.LayerNorm(proj_dim))
-        #         layers.append(nn.GELU())
-        #         layers.append(nn.Dropout(dropout[2]))
-        #         cur_dim = proj_dim
-        #     self.mlp = nn.Sequential(*layers)
-        #     final_dim = proj_dim
-        #
-        # self.final_dim = final_dim
-        # self.head_drop = nn.Dropout(dropout[1])
-        # self.output_layer = nn.Linear(final_dim, self.output_dim)
+        if num_layers <= 0:
+            self.mlp = nn.Identity()
+            final_dim = base_dim
+        else:
+            layers = []
+            cur_dim = base_dim
+            for _ in range(num_layers):
+                layers.append(nn.Linear(cur_dim, proj_dim))
+                layers.append(nn.LayerNorm(proj_dim))
+                layers.append(nn.GELU())
+                layers.append(nn.Dropout(dropout[2]))
+                cur_dim = proj_dim
+            self.mlp = nn.Sequential(*layers)
+            final_dim = proj_dim
 
-        # ========= 7. Classification head =========
-        self.mlp = ResidualClassificationHead(
-            in_dim=base_dim,
-            proj_dim=proj_dim,
-            num_layers=num_layers,
-            dropout=dropout[2],
-        )
-
-        self.final_dim = self.mlp.out_dim
+        self.final_dim = final_dim
         self.head_drop = nn.Dropout(dropout[1])
-
-        # Use cosine classifier to align classifier geometry with retrieval cosine space.
-        head_scale = getattr(args, "head_scale", 16.0) if args is not None else 16.0
-        self.output_layer = CosineBinaryClassifier(
-            dim=self.final_dim,
-            scale=head_scale,
-        )
+        self.output_layer = nn.Linear(final_dim, self.output_dim)
 
         # ========= 8. Attribution-guided counterfactual module =========
         self.cf_topk_ratio = getattr(args, "cf_topk_ratio", 0.12) if args is not None else 0.12
