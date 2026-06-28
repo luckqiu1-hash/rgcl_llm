@@ -786,8 +786,14 @@ class classifier_hateClipper(nn.Module):
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
-        nn.init.normal_(self.output_layer.weight, mean=0.0, std=0.02)
-        if self.output_layer.bias is not None:
+        # nn.init.normal_(self.output_layer.weight, mean=0.0, std=0.02)
+        # if self.output_layer.bias is not None:
+        #     nn.init.zeros_(self.output_layer.bias)
+
+        if hasattr(self.output_layer, "weight"):
+            nn.init.normal_(self.output_layer.weight, mean=0.0, std=0.02)
+
+        if hasattr(self.output_layer, "bias") and self.output_layer.bias is not None:
             nn.init.zeros_(self.output_layer.bias)
 
     def _build_counterfactual_embed(self, embed, linear_output):
