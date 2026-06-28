@@ -14,14 +14,22 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Create dev/test feature files from the original test set using the same seed split as eval_random_split_acc.py."
     )
-    parser.add_argument("--src_data_root", type=str, required=True,
-                        help="Original data root that contains CLIP_Embedding/Toxicn_mm.")
-    parser.add_argument("--dst_data_root", type=str, required=True,
-                        help="New data root to write CLIP_Embedding/Toxicn_mm with the seed split.")
+    parser.add_argument(
+        "--src_data_root",
+        type=str,
+        default=r"E:\qxy\code\rgcl_llm\src\data\CLIP_Embedding\Toxicn_mm",
+        help="Original CLIP embedding dataset directory, e.g. .../CLIP_Embedding/Toxicn_mm.",
+    )
+    parser.add_argument(
+        "--dst_data_root",
+        type=str,
+        default=r"E:\qxy\code\rgcl_llm\src\data\CLIP_Embedding\Toxicn_mm_split",
+        help="New CLIP embedding dataset directory to write the seed split.",
+    )
     parser.add_argument("--res_txt", type=str, default="./src/toixic_mm_res.txt",
                         help="Prediction result txt used to define the split ids.")
     parser.add_argument("--dataset", type=str, default="Toxicn_mm")
-    parser.add_argument("--model", type=str, default="")
+    parser.add_argument("--model", type=str, default="clip-vit-large-patch14-336_HF")
     parser.add_argument("--seed", type=int, default=638)
     parser.add_argument("--test_ratio", type=float, default=0.5)
     parser.add_argument("--stratify", type=lambda x: str(x).lower() == "true", default=True)
@@ -105,8 +113,8 @@ def main():
 
     import torch
 
-    src_embedding_dir = os.path.join(args.src_data_root, "CLIP_Embedding", args.dataset)
-    dst_embedding_dir = os.path.join(args.dst_data_root, "CLIP_Embedding", args.dataset)
+    src_embedding_dir = args.src_data_root
+    dst_embedding_dir = args.dst_data_root
     os.makedirs(dst_embedding_dir, exist_ok=True)
 
     suffix = f"_{args.model}.pt"
