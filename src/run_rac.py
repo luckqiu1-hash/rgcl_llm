@@ -1,7 +1,8 @@
 import torch.nn as nn
 import torch
 from model.evaluate_rac import retrieve_evaluate_RAC_, final_evaluation
-from model.classifier import classifier_hateClipper
+# from model.classifier import classifier_hateClipper
+from model.classifier_exp import classifier_hateClipper
 from model.loss import compute_loss
 import argparse
 import wandb
@@ -392,7 +393,7 @@ pre: {:.4f} recall: {:.4f} f1: {:.4f}".format(
         print(" ")
         # Save the model if the val criterion is the best so far
 
-        with open("E:\qxy\code\\rgcl_llm\src/log_toxicn_mm.txt", "a", encoding="utf-8") as f:
+        with open(args.output_path, "a", encoding="utf-8") as f:
             # 写入Test指标
             test_line = "Test Epoch {} val_acc: {:.4f} val_roc: {:.4f} test_acc: {:.4f} test_roc: {:.4f}\n".format(
                 epoch, acc_, roc_, test_acc_, test_roc_
@@ -426,7 +427,7 @@ pre: {:.4f} recall: {:.4f} f1: {:.4f}".format(
                 args.output_path +
                 "/ckpt/last_model_{}_{}.pt".format(epoch, test_acc_)
             )
-    with open("E:\qxy\code\\rgcl_llm\src/log_toxicn_mm.txt", "a", encoding="utf-8") as f:
+    with open(args.output_path, "a", encoding="utf-8") as f:
         best_line = f"best_epoch:{best_epoch}       best_acc:{best_acc}"
         f.write(best_line)
     return model, best_epoch_path
