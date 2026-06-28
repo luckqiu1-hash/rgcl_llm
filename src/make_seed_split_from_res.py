@@ -26,7 +26,7 @@ def parse_args():
         default=r"E:\qxy\code\rgcl_llm\src\data\CLIP_Embedding\Toxicn_mm_split",
         help="New CLIP embedding dataset directory to write the seed split.",
     )
-    parser.add_argument("--res_txt", type=str, default="./src/toixic_mm_res.txt",
+    parser.add_argument("--res_txt", type=str, default="E:\qxy\code\\rgcl_llm\src\\toixic_mm_res.txt",
                         help="Prediction result txt used to define the split ids.")
     parser.add_argument("--dataset", type=str, default="Toxicn_mm")
     parser.add_argument("--model", type=str, default="clip-vit-large-patch14-336_HF")
