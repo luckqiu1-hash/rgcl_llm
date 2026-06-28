@@ -19,15 +19,15 @@ def parse_args():
         description="Load a RAC checkpoint and save correct / wrong test predictions."
     )
 
-    parser.add_argument("--pth_path", type=str, required=True, help="Path to the .pth/.pt checkpoint.")
-    parser.add_argument("--save_txt", type=str, required=True, help="Path to save prediction details txt.")
+    parser.add_argument("--pth_path", type=str, default='E:\qxy\code\\rgcl_llm\src\log_toxicn_mm\Retrieval\Toxicn_mm\\best_model.pt', help="Path to the .pth/.pt checkpoint.")
+    parser.add_argument("--save_txt", type=str, default='E:\qxy\code\\rgcl_llm\src\\toixic_mm_res.txt', help="Path to save prediction details txt.")
     parser.add_argument("--path", type=str, default="./data/", help="Dataset root. CLIP_Embedding should be under it.")
     parser.add_argument("--dataset", type=str, default="Toxicn_mm")
-    parser.add_argument("--model", type=str, default="")
+    parser.add_argument("--model", type=str, default="clip-vit-large-patch14-336_HF")
     parser.add_argument("--split", type=str, default="test_seen", choices=["dev", "test_seen", "test_unseen"])
 
     parser.add_argument("--batch_size", type=int, default=128)
-    parser.add_argument("--topk", type=int, default=5)
+    parser.add_argument("--topk", type=int, default=30)
     parser.add_argument("--similarity_threshold", type=float, default=-1.0)
     parser.add_argument("--majority_voting", type=str, default="mean", choices=["mean", "arithmetic"])
     parser.add_argument("--decision_threshold", type=float, default=None,

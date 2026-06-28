@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch
 from model.evaluate_rac import retrieve_evaluate_RAC_, final_evaluation
 # from model.classifier import classifier_hateClipper
-from model.classifier_exp import classifier_hateClipper
+from model.classifier_cf import classifier_hateClipper
 from model.loss import compute_loss
 import argparse
 import wandb
@@ -25,7 +25,10 @@ def parse_args():
     arg_parser.add_argument(
         "--path", type=str, default="E:\qxy\code\\rgcl_llm\src\data/")
     arg_parser.add_argument(
-        "--output_path", type=str, default="E:\qxy\code\\rgcl_llm\src\log_toxicn_mm/"
+        "--output_path", type=str, default="E:\qxy\code\\rgcl_llm\src\log_toxicn_mm_cf/"
+    )
+    arg_parser.add_argument(
+        "--output_log", type=str, default="E:\qxy\code\\rgcl_llm\src\log_toxicn_mm_cf.txt"
     )
     arg_parser.add_argument("--model", type=str, default="")
 
@@ -393,7 +396,7 @@ pre: {:.4f} recall: {:.4f} f1: {:.4f}".format(
         print(" ")
         # Save the model if the val criterion is the best so far
 
-        with open(args.output_path, "a", encoding="utf-8") as f:
+        with open(args.output_log, "a", encoding="utf-8") as f:
             # 写入Test指标
             test_line = "Test Epoch {} val_acc: {:.4f} val_roc: {:.4f} test_acc: {:.4f} test_roc: {:.4f}\n".format(
                 epoch, acc_, roc_, test_acc_, test_roc_
@@ -427,7 +430,7 @@ pre: {:.4f} recall: {:.4f} f1: {:.4f}".format(
                 args.output_path +
                 "/ckpt/last_model_{}_{}.pt".format(epoch, test_acc_)
             )
-    with open(args.output_path, "a", encoding="utf-8") as f:
+    with open(args.output_log, "a", encoding="utf-8") as f:
         best_line = f"best_epoch:{best_epoch}       best_acc:{best_acc}"
         f.write(best_line)
     return model, best_epoch_path

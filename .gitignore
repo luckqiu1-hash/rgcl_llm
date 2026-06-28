@@ -14,3 +14,5 @@ artifacts
 log_toxicn_mm
 log
 clip_model
+log_toxicn_mm_cf
+log_toxicn_mm_exp

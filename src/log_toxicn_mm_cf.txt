@@ -1,0 +1,9 @@
+Test Epoch 0 val_acc: 0.7842 val_roc: 0.8181 test_acc: 0.7842 test_roc: 0.8181
+Test Epoch 1 val_acc: 0.7929 val_roc: 0.8221 test_acc: 0.7929 test_roc: 0.8221
+Test Epoch 2 val_acc: 0.7954 val_roc: 0.8361 test_acc: 0.7954 test_roc: 0.8361
+Test Epoch 3 val_acc: 0.8112 val_roc: 0.8353 test_acc: 0.8112 test_roc: 0.8353
+Test Epoch 4 val_acc: 0.8079 val_roc: 0.8410 test_acc: 0.8079 test_roc: 0.8410
+Test Epoch 5 val_acc: 0.8017 val_roc: 0.8286 test_acc: 0.8017 test_roc: 0.8286
+Test Epoch 6 val_acc: 0.8025 val_roc: 0.8305 test_acc: 0.8025 test_roc: 0.8305
+Test Epoch 7 val_acc: 0.8050 val_roc: 0.8346 test_acc: 0.8050 test_roc: 0.8346
+Test Epoch 8 val_acc: 0.8021 val_roc: 0.8371 test_acc: 0.8021 test_roc: 0.8371
