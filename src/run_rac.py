@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch
 from model.evaluate_rac import retrieve_evaluate_RAC_, final_evaluation
 # from model.classifier import classifier_hateClipper
-from model.classifier_cf import classifier_hateClipper
+from model.classifier_exp import classifier_hateClipper
 from model.loss import compute_loss
 import argparse
 import wandb
@@ -25,10 +25,10 @@ def parse_args():
     arg_parser.add_argument(
         "--path", type=str, default="E:\qxy\code\\rgcl_llm\src\data/")
     arg_parser.add_argument(
-        "--output_path", type=str, default="E:\qxy\code\\rgcl_llm\src\log_toxicn_mm_cf/"
+        "--output_path", type=str, default="E:\qxy\code\\rgcl_llm\src\log_toxicn_mm_exp/"
     )
     arg_parser.add_argument(
-        "--output_log", type=str, default="E:\qxy\code\\rgcl_llm\src\log_toxicn_mm_cf.txt"
+        "--output_log", type=str, default="E:\qxy\code\\rgcl_llm\src\log_toxicn_mm_exp.txt"
     )
     arg_parser.add_argument("--model", type=str, default="")
 
