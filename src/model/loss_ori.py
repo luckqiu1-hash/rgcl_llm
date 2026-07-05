@@ -1,26 +1,26 @@
 import torch
 # torch.autograd.set_detect_anomaly(True)
 import torch.nn as nn
-from utils.retrieval import dense_retrieve_hard_negatives_pseudo_positive, sparse_retrieve_hard_negatives_pseudo_positive
+from utils.retrieval import dense_retrieve_hard_negatives_pseudo_positive, \
+    sparse_retrieve_hard_negatives_pseudo_positive
 
 
-def compute_loss(batch, 
-                train_dl, 
-                model, 
-                args, 
-                train_set=None, 
-                sparse_retrieval_dictionary=None,
-                train_feats=None,
-                train_labels=None
-                ):
+def compute_loss(batch,
+                 train_dl,
+                 model,
+                 args,
+                 train_set=None,
+                 sparse_retrieval_dictionary=None,
+                 train_feats=None,
+                 train_labels=None
+                 ):
     ids = batch["ids"]
     batch_size = len(ids)
     image_feats = batch["image_feats"].to(args.device)
     text_feats = batch["text_feats"].to(args.device)
-    exp_feats = batch["exp_feats"].to(args.device)
     labels = batch["labels"].to(args.device)
     model.train()
-    output, feats = model(image_feats, text_feats, exp_feats, return_embed=True)
+    output, feats = model(image_feats, text_feats, return_embed=True)
 
     # We construct a matrix for label coincidences (Mask matrix for later loss computation)
     # 1 if the labels are the same (positive), 0 otherwise (negative)
@@ -148,7 +148,7 @@ def compute_loss(batch,
     # V3 implementation masking and replacing nan by zero
     """
     ## in_batch_negative_loss_sum = torch.sum(in_batch_negative_loss, dim=1) / in_batch_negative_no
-    
+
     # Assert the number of samples from in_batch_negative_no and the number of non zero elements in in_batch_negative_loss are the same
     mask = in_batch_negative_loss != 0
     in_batch_negative_loss_sum = torch.sum(in_batch_negative_loss, dim=1) / mask.sum(dim=1)
@@ -220,10 +220,10 @@ def compute_loss(batch,
     print("in-batch loss")
     print(in_batch_negative_loss.shape,
         in_batch_negative_no.shape, in_batch_negative_loss, in_batch_negative_no, torch.mean(in_batch_negative_loss, dim=1))
-    
+
     print(in_batch_positives_loss.shape,
         in_batch_positives_no.shape, in_batch_positives_loss, in_batch_positives_no, torch.mean(in_batch_positives_loss, dim=1))
-    
+
     print("in-batch positive loss sum:", in_batch_positives_loss_sum)
     print("in-batch negative loss sum:", in_batch_negative_loss_sum)
     print("in-batch loss sum:", in_batch_loss)
@@ -233,13 +233,13 @@ def compute_loss(batch,
     # retrieve hard negatives and pseudo gold with Dense retrieval
 
     # Only hard negative
-    #print("start to retrieve hard negatives and pseudo gold")
+    # print("start to retrieve hard negatives and pseudo gold")
     if args.sparse_dictionary is None:
         if args.hard_negatives_loss and args.no_pseudo_gold_positives == 0:
             (
                 hard_negative_features,
                 hard_negative_scores,
-                train_feats, 
+                train_feats,
                 train_labels,
             ) = dense_retrieve_hard_negatives_pseudo_positive(
                 train_dl,
@@ -253,7 +253,7 @@ def compute_loss(batch,
             )
         # Both hard negative and pseudo gold,
         # In default we will consider hard negative, which is key
-        # to the good performance. 
+        # to the good performance.
         # But if we want to test without hard negative, this is also fine
         # We can just ignore the hard negative features and scores
         elif args.no_pseudo_gold_positives > 0:
@@ -262,7 +262,7 @@ def compute_loss(batch,
                 hard_negative_scores,
                 pseudo_positive_features,
                 pseudo_positive_scores,
-                train_feats, 
+                train_feats,
                 train_labels,
             ) = dense_retrieve_hard_negatives_pseudo_positive(
                 train_dl,
@@ -276,14 +276,14 @@ def compute_loss(batch,
             )
         else:
             pass
-    # For sparse retrieval, 
+    # For sparse retrieval,
     # we always retrieve both hard negatives and pseudo gold
-    # Since no computation will be saved 
+    # Since no computation will be saved
     # by only retrieving hard negatives/pseudo gold
     else:
-        (   hard_negative_features,
-            pseudo_positive_features,   
-        )= sparse_retrieve_hard_negatives_pseudo_positive(
+        (hard_negative_features,
+         pseudo_positive_features,
+         ) = sparse_retrieve_hard_negatives_pseudo_positive(
             ids,
             labels,
             train_set,
@@ -291,8 +291,6 @@ def compute_loss(batch,
             sparse_retrieval_dictionary,
             args,
         )
-                
-            
 
     # for hard negative loss
     if args.hard_negatives_loss:
@@ -315,7 +313,7 @@ def compute_loss(batch,
         # For simplicity, we only check if the first dimension is zero in the feature embedding
         # The mask is batch_size x no_hard_negatives, 1 if embedding non zero, 0 if embedding zero,
         # Thus we can multiply the mask with the loss.
-        #zeroLoss_mask = hard_negative_features[:, :, 0] != 0
+        # zeroLoss_mask = hard_negative_features[:, :, 0] != 0
 
         # 2024.12.07 update, the above method is not correct, since the first dimension can be zero for some samples
         # Instead, we will sum the sum of the value of the embeddings
@@ -369,7 +367,7 @@ def compute_loss(batch,
 
     # If not using hard negative, set to 0
     else:
-        #hard_loss = 0
+        # hard_loss = 0
         hard_loss = torch.tensor([0.0], device=args.device)
 
     # for pseudo gold loss
@@ -411,7 +409,6 @@ def compute_loss(batch,
 
         # For contrastive loss, we take mean during the loss computation
         if args.loss != "contrastive":
-
             pseudo_gold_loss = torch.mean(pseudo_gold_loss, dim=1)
             """print("pseudo_gold loss")
             print(pseudo_gold_loss.shape)
@@ -419,7 +416,7 @@ def compute_loss(batch,
 
     # if not using psedo gold, set to 0
     else:
-        #pseudo_gold_loss = 0
+        # pseudo_gold_loss = 0
         # use tensor zero instead
         pseudo_gold_loss = torch.tensor([0.0], device=args.device)
 
@@ -448,11 +445,12 @@ def compute_loss(batch,
         neg_zero_count_zero_mask = torch.zeros(batch_size, device=args.device) != in_batch_negative_no
         in_batch_negative_loss_tmp = torch.zeros(
             batch_size, device=args.device)
-        #in_batch_negative_loss_tmp[neg_zero_count_zero_mask] = (torch.exp(in_batch_negative_loss[neg_zero_count_zero_mask]).sum(
+        # in_batch_negative_loss_tmp[neg_zero_count_zero_mask] = (torch.exp(in_batch_negative_loss[neg_zero_count_zero_mask]).sum(
         #    dim=1) - neg_zero_count[neg_zero_count_zero_mask]) / (neg_mask.sum(dim=1))[neg_zero_count_zero_mask]
-        
-        in_batch_negative_loss_tmp[neg_zero_count_zero_mask] = (torch.exp(in_batch_negative_loss[neg_zero_count_zero_mask]).sum(
-            dim=1) - neg_zero_count[neg_zero_count_zero_mask])
+
+        in_batch_negative_loss_tmp[neg_zero_count_zero_mask] = (
+                    torch.exp(in_batch_negative_loss[neg_zero_count_zero_mask]).sum(
+                        dim=1) - neg_zero_count[neg_zero_count_zero_mask])
         in_batch_negative_loss = in_batch_negative_loss_tmp
         """print(in_batch_negative_no)
         print(neg_zero_count)
@@ -474,7 +472,8 @@ def compute_loss(batch,
             # We need to count the number of zero terms to discard them in the loss computation,
             # Since zero terms gives exp(0) = 1, we will delete the the number of zeros to discard the zero term
             hard_loss_tmp[hard_zero_count_zero_mask] = (torch.exp(hard_loss[hard_zero_count_zero_mask]).sum(
-                dim=1) - hard_zero_count[hard_zero_count_zero_mask]) / (hard_neg_mask.sum(dim=1))[hard_zero_count_zero_mask]
+                dim=1) - hard_zero_count[hard_zero_count_zero_mask]) / (hard_neg_mask.sum(dim=1))[
+                                                           hard_zero_count_zero_mask]
             hard_loss = hard_loss_tmp
 
         """print(hard_zero_count)
@@ -509,7 +508,7 @@ def compute_loss(batch,
             pseudo_gold_loss = torch.mean(torch.exp(pseudo_gold_loss), dim=1)
 
             loss = - torch.log(pseudo_gold_loss / (hard_loss +
-                               pseudo_gold_loss + in_batch_negative_loss))
+                                                   pseudo_gold_loss + in_batch_negative_loss))
 
         """print("Loss:", loss) 
         print("Hard Loss:", hard_loss)
@@ -525,13 +524,14 @@ def compute_loss(batch,
         else:
             lossFn_classifier = nn.BCEWithLogitsLoss()
         loss_classifier = lossFn_classifier(
-                output, labels.float().reshape(-1, 1))
-        #total_loss = (total_loss + loss_classifier * args.ce_weight) / (1 + args.ce_weight)
-        total_loss = total_loss * (1-args.ce_weight) + loss_classifier * args.ce_weight
+            output, labels.float().reshape(-1, 1))
+        # total_loss = (total_loss + loss_classifier * args.ce_weight) / (1 + args.ce_weight)
+        total_loss = total_loss * (1 - args.ce_weight) + loss_classifier * args.ce_weight
     else:
         loss_classifier = 0
 
-    return total_loss, torch.mean(in_batch_loss), torch.mean(hard_loss), torch.mean(pseudo_gold_loss), loss_classifier, train_feats, train_labels
+    return total_loss, torch.mean(in_batch_loss), torch.mean(hard_loss), torch.mean(
+        pseudo_gold_loss), loss_classifier, train_feats, train_labels
 
 
 def compute_l2(feats_1, feats_2, normalise=False, sum_dim=1, sqrt=False, eps=1e-5):

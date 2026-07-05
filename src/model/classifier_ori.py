@@ -119,7 +119,7 @@ class classifier_hateClipper(nn.Module):
             print("Unknown dataset: {} using binary classification by default")
             self.output_layer = nn.Linear(proj_dim, 1)
 
-    def forward(self, img_feats, text_feats, exp_feats=None, return_embed=False):
+    def forward(self, img_feats, text_feats, return_embed=False):
         img_feats = self.img_proj(img_feats)
         text_feats = self.text_proj(text_feats)
 
@@ -139,4 +139,3 @@ class classifier_hateClipper(nn.Module):
         if return_embed:
             return output, embed
         return output
-
