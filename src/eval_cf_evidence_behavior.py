@@ -11,7 +11,8 @@ for module_path in (CURRENT_DIR, ROOT_DIR):
     if module_path not in sys.path:
         sys.path.insert(0, module_path)
 
-
+# E:\qxy\code\rgcl_llm\src\log_toxicn_mm\Retrieval\Toxicn_mm\best_model.pt
+# E:\qxy\code\rgcl_llm\src\log_toxicn_mm_cf\best_model.pt
 def str2bool(value):
     return str(value).lower() == "true"
 

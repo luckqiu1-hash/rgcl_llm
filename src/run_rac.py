@@ -1,8 +1,8 @@
 import torch.nn as nn
 import torch
 from model.evaluate_rac import retrieve_evaluate_RAC_, final_evaluation
-# from model.classifier import classifier_hateClipper
-from model.classifier_exp import classifier_hateClipper
+from model.classifier import classifier_hateClipper
+# from model.classifier_exp import classifier_hateClipper
 from model.loss import compute_loss
 import argparse
 import wandb
