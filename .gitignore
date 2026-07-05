@@ -16,3 +16,4 @@ log
 clip_model
 log_toxicn_mm_cf
 log_toxicn_mm_exp
+log_toxicn_mm_baseline
