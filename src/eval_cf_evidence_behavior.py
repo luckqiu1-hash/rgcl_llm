@@ -37,7 +37,12 @@ def parse_args():
     parser.add_argument("--output_dir", type=str, default="./src/cf_evidence_behavior")
 
     parser.add_argument("--batch_size", type=int, default=128)
-    parser.add_argument("--decision_threshold", type=float, default=0.5)
+    parser.add_argument(
+        "--decision_threshold",
+        type=float,
+        default=None,
+        help="Classification threshold. Default: search the best threshold on original probabilities, matching run_rac.py eval_metrics.",
+    )
     parser.add_argument("--cf_topk_ratio", type=float, default=0.12)
     parser.add_argument("--cf_mask_value", type=float, default=0.05)
     parser.add_argument("--device", type=str, default="cuda")
@@ -145,6 +150,19 @@ def sigmoid_tensor(logits):
     return torch.sigmoid(logits.view(-1))
 
 
+def best_threshold(probs, labels):
+    best_thr = 0.5
+    best_acc = -1.0
+    for idx in range(1, 100):
+        thr = idx / 100.0
+        preds = [int(prob >= thr) for prob in probs]
+        acc = sum(int(pred == label) for pred, label in zip(preds, labels)) / len(labels)
+        if acc > best_acc:
+            best_acc = acc
+            best_thr = thr
+    return best_thr
+
+
 def counterfactual_logits(model, embed, topk_ratio, mask_value):
     output_layer = model.output_layer
     if not hasattr(output_layer, "weight"):
@@ -195,9 +213,6 @@ def evaluate_model(model_name, module_name, checkpoint, args, eval_dl, device):
 
             orig_prob = sigmoid_tensor(logits)
             cf_prob = sigmoid_tensor(cf_logits)
-            orig_pred = (orig_prob >= args.decision_threshold).long()
-            cf_pred = (cf_prob >= args.decision_threshold).long()
-
             for i, sample_id in enumerate(ids):
                 label = int(labels[i].item())
                 op = float(orig_prob[i].detach().cpu().item())
@@ -210,12 +225,24 @@ def evaluate_model(model_name, module_name, checkpoint, args, eval_dl, device):
                         "orig_prob": op,
                         "cf_prob": cp,
                         "delta_orig_minus_cf": op - cp,
-                        "orig_pred": int(orig_pred[i].item()),
-                        "cf_pred": int(cf_pred[i].item()),
-                        "flipped": int(orig_pred[i].item() != cf_pred[i].item()),
+                        "orig_pred": -1,
+                        "cf_pred": -1,
+                        "flipped": -1,
                         "topk_dims": " ".join(str(int(x)) for x in topk_idx[i].detach().cpu().tolist()),
                     }
                 )
+
+    labels_for_threshold = [row["label"] for row in sample_rows]
+    probs_for_threshold = [row["orig_prob"] for row in sample_rows]
+    threshold = args.decision_threshold
+    if threshold is None:
+        threshold = best_threshold(probs_for_threshold, labels_for_threshold)
+
+    for row in sample_rows:
+        row["decision_threshold"] = threshold
+        row["orig_pred"] = int(row["orig_prob"] >= threshold)
+        row["cf_pred"] = int(row["cf_prob"] >= threshold)
+        row["flipped"] = int(row["orig_pred"] != row["cf_pred"])
 
     return sample_rows
 
@@ -245,6 +272,7 @@ def summarize_model(rows):
 
     return {
         "model": rows[0]["model"] if rows else "",
+        "decision_threshold": rows[0]["decision_threshold"] if rows else 0.0,
         "total": len(rows),
         "toxic_total": len(toxic_rows),
         "nontoxic_total": len(nontoxic_rows),
@@ -264,6 +292,7 @@ def save_sample_rows(rows, path):
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     fieldnames = [
         "model",
+        "decision_threshold",
         "id",
         "label",
         "orig_prob",
@@ -286,6 +315,7 @@ def save_summary_rows(rows, path):
     fieldnames = [
         "model",
         "checkpoint",
+        "decision_threshold",
         "total",
         "toxic_total",
         "nontoxic_total",
