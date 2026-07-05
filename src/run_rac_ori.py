@@ -49,12 +49,9 @@ def main():
 
     # Keep user-provided values untouched, but make the default output clearly
     # separate from the explanation/CF experiments.
-    if args.output_path.endswith("log_toxicn_mm_exp/") or args.output_path.endswith("log_toxicn_mm_exp\\"):
-        args.output_path = args.output_path.replace("log_toxicn_mm_exp", "log_toxicn_mm_ori")
-    if args.output_log.endswith("log_toxicn_mm_exp.txt"):
-        args.output_log = args.output_log.replace("log_toxicn_mm_exp", "log_toxicn_mm_ori")
-    if args.group_name == "RAC_TEST":
-        args.group_name = "RAC_ori"
+    args.output_path = "E:\qxy\code\\rgcl_llm\src\log_toxicn_mm_baseline/"
+    args.output_log = "E:\qxy\code\\rgcl_llm\src\log_toxicn_mm_baseline.txt"
+
     if "_ori_baseline" not in args.exp_comment:
         args.exp_comment = f"{args.exp_comment}_ori_baseline"
 
