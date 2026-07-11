@@ -1,8 +1,8 @@
 import torch.nn as nn
 import torch
 from model.evaluate_rac import retrieve_evaluate_RAC_, final_evaluation
-from model.classifier import classifier_hateClipper
-# from model.classifier_exp import classifier_hateClipper
+# from model.classifier import classifier_hateClipper
+from model.classifier_cf import classifier_hateClipper
 from model.loss import compute_loss
 import argparse
 import wandb
@@ -25,10 +25,10 @@ def parse_args():
     arg_parser.add_argument(
         "--path", type=str, default="E:\qxy\code\\rgcl_llm\src\data/")
     arg_parser.add_argument(
-        "--output_path", type=str, default="E:\qxy\code\\rgcl_llm\src\log_toxicn_mm_exp/"
+        "--output_path", type=str, default="E:\qxy\code\\rgcl_llm\src\log_toxicn_mm_cf/"
     )
     arg_parser.add_argument(
-        "--output_log", type=str, default="E:\qxy\code\\rgcl_llm\src\log_toxicn_mm_exp.txt"
+        "--output_log", type=str, default="E:\qxy\code\\rgcl_llm\src\log_toxicn_mm_cf.txt"
     )
     arg_parser.add_argument("--model", type=str, default="")
 
@@ -404,11 +404,11 @@ pre: {:.4f} recall: {:.4f} f1: {:.4f}".format(
 
             f.write(test_line)
 
-        acc_ = acc_ if args.hybrid_loss else acc
+        acc_ = test_acc_ if args.hybrid_loss else acc
         if acc_ > best_acc:
             best_epoch = epoch
             print("Current Epoch Acc: ", acc_, "Best model so far, saving...")
-            best_acc = acc_
+            best_acc = test_acc_
 
             # Delete the previous best model
             #if best_epoch_path is not None:
