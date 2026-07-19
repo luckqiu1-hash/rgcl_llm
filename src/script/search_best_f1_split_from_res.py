@@ -158,9 +158,21 @@ def compute_metrics(records, threshold):
     fp = sum(1 for item in records if item["label"] == 0 and item["prob"] >= threshold)
     fn = sum(1 for item in records if item["label"] == 1 and item["prob"] < threshold)
 
-    precision = tp / (tp + fp) if tp + fp else 0.0
-    recall = tp / (tp + fn) if tp + fn else 0.0
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    harm_precision = tp / (tp + fp) if tp + fp else 0.0
+    harm_recall = tp / (tp + fn) if tp + fn else 0.0
+    harm_f1 = 2 * harm_precision * harm_recall / (harm_precision + harm_recall) if harm_precision + harm_recall else 0.0
+
+    nonharm_precision = tn / (tn + fn) if tn + fn else 0.0
+    nonharm_recall = tn / (tn + fp) if tn + fp else 0.0
+    nonharm_f1 = (
+        2 * nonharm_precision * nonharm_recall / (nonharm_precision + nonharm_recall)
+        if nonharm_precision + nonharm_recall
+        else 0.0
+    )
+
+    macro_precision = (nonharm_precision + harm_precision) / 2.0
+    macro_recall = (nonharm_recall + harm_recall) / 2.0
+    macro_f1 = (nonharm_f1 + harm_f1) / 2.0
     acc = (tp + tn) / total if total else 0.0
 
     return {
@@ -175,9 +187,18 @@ def compute_metrics(records, threshold):
         "FP": fp,
         "FN": fn,
         "ACC": acc,
-        "Precision": precision,
-        "Recall": recall,
-        "F1": f1,
+        "Precision": macro_precision,
+        "Recall": macro_recall,
+        "F1": macro_f1,
+        "Macro_Precision": macro_precision,
+        "Macro_Recall": macro_recall,
+        "Macro_F1": macro_f1,
+        "Harm_Precision": harm_precision,
+        "Harm_Recall": harm_recall,
+        "Harm_F1": harm_f1,
+        "Nonharm_Precision": nonharm_precision,
+        "Nonharm_Recall": nonharm_recall,
+        "Nonharm_F1": nonharm_f1,
         "AUC": safe_auc(records),
     }
 
@@ -196,6 +217,7 @@ def find_best_f1_threshold(records):
 
         key = (
             metrics["F1"],
+            metrics["Harm_F1"],
             metrics["Precision"],
             metrics["Recall"],
             metrics["ACC"],
@@ -269,6 +291,9 @@ def write_rows(rows, output_csv):
         "dev_Precision",
         "dev_Recall",
         "dev_F1",
+        "dev_Harm_Precision",
+        "dev_Harm_Recall",
+        "dev_Harm_F1",
         "dev_AUC",
         "test_size",
         "test_pos",
@@ -276,6 +301,9 @@ def write_rows(rows, output_csv):
         "test_Precision",
         "test_Recall",
         "test_F1",
+        "test_Harm_Precision",
+        "test_Harm_Recall",
+        "test_Harm_F1",
         "test_AUC",
         "mean_F1",
     ]
@@ -294,6 +322,9 @@ def write_rows(rows, output_csv):
                 "dev_Precision": f'{dev["Precision"]:.6f}',
                 "dev_Recall": f'{dev["Recall"]:.6f}',
                 "dev_F1": f'{dev["F1"]:.6f}',
+                "dev_Harm_Precision": f'{dev["Harm_Precision"]:.6f}',
+                "dev_Harm_Recall": f'{dev["Harm_Recall"]:.6f}',
+                "dev_Harm_F1": f'{dev["Harm_F1"]:.6f}',
                 "dev_AUC": "" if dev["AUC"] is None else f'{dev["AUC"]:.6f}',
                 "test_size": test["total"],
                 "test_pos": test["positive"],
@@ -301,6 +332,9 @@ def write_rows(rows, output_csv):
                 "test_Precision": f'{test["Precision"]:.6f}',
                 "test_Recall": f'{test["Recall"]:.6f}',
                 "test_F1": f'{test["F1"]:.6f}',
+                "test_Harm_Precision": f'{test["Harm_Precision"]:.6f}',
+                "test_Harm_Recall": f'{test["Harm_Recall"]:.6f}',
+                "test_Harm_F1": f'{test["Harm_F1"]:.6f}',
                 "test_AUC": "" if test["AUC"] is None else f'{test["AUC"]:.6f}',
                 "mean_F1": f'{row["mean_f1"]:.6f}',
             })

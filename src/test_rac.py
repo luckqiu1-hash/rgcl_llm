@@ -307,9 +307,9 @@ def best_threshold(probs, labels, metric_name):
         if predicted_positive == 0:
             continue
 
-        precision = precision_score(labels, preds, zero_division=0)
-        recall = recall_score(labels, preds, zero_division=0)
-        f1 = f1_score(labels, preds, zero_division=0)
+        precision = precision_score(labels, preds, average="macro", zero_division=0)
+        recall = recall_score(labels, preds, average="macro", zero_division=0)
+        f1 = f1_score(labels, preds, average="macro", zero_division=0)
         acc = accuracy_score(labels, preds)
 
         if metric_name == "precision":
@@ -345,9 +345,15 @@ def compute_metric_dict(labels, probs, preds, score_for_auc, threshold):
         "predicted_positive": int(np.sum(preds == 1)),
         "predicted_negative": int(np.sum(preds == 0)),
         "ACC": round(float(accuracy_score(labels, preds)), 6),
-        "Precision": round(float(precision_score(labels, preds, zero_division=0)), 6),
-        "Recall": round(float(recall_score(labels, preds, zero_division=0)), 6),
-        "F1": round(float(f1_score(labels, preds, zero_division=0)), 6),
+        "Precision": round(float(precision_score(labels, preds, average="macro", zero_division=0)), 6),
+        "Recall": round(float(recall_score(labels, preds, average="macro", zero_division=0)), 6),
+        "F1": round(float(f1_score(labels, preds, average="macro", zero_division=0)), 6),
+        "Macro_Precision": round(float(precision_score(labels, preds, average="macro", zero_division=0)), 6),
+        "Macro_Recall": round(float(recall_score(labels, preds, average="macro", zero_division=0)), 6),
+        "Macro_F1": round(float(f1_score(labels, preds, average="macro", zero_division=0)), 6),
+        "Harm_Precision": round(float(precision_score(labels, preds, pos_label=1, zero_division=0)), 6),
+        "Harm_Recall": round(float(recall_score(labels, preds, pos_label=1, zero_division=0)), 6),
+        "Harm_F1": round(float(f1_score(labels, preds, pos_label=1, zero_division=0)), 6),
     }
 
     try:
