@@ -27,7 +27,7 @@ def parse_args():
     parser.add_argument("--path", type=str, default="./data/", help="Dataset root. CLIP_Embedding should be under it.")
     parser.add_argument("--dataset", type=str, default="Toxicn_mm")
     parser.add_argument("--model", type=str, default="clip-vit-large-patch14-336_HF")
-    parser.add_argument("--ckpt_path", "--pth_path", dest="ckpt_path", type=str, required=True,
+    parser.add_argument("--ckpt_path", "--pth_path", dest="ckpt_path", type=str, default='E:\qxy\code\\rgcl_llm\src\log_toxicn_mm\Retrieval\Toxicn_mm\\best_model.pt',
                         help="Path to trained .pt/.pth checkpoint.")
     parser.add_argument("--split", type=str, default="test_seen", choices=["dev", "test_seen", "test_unseen"],
                         help="Split to evaluate.")

@@ -1,0 +1,35 @@
+{
+  "checkpoint": "E:\\qxy\\code\\rgcl_llm\\src\\log_toxicn_mm\\Retrieval\\Toxicn_mm\\best_model.pt",
+  "dataset": "Toxicn_mm",
+  "split": "test_seen",
+  "model": "clip-vit-large-patch14-336_HF",
+  "topk": 30,
+  "similarity_threshold": -1.0,
+  "majority_voting": "arithmetic",
+  "retrieval_metrics": {
+    "threshold": 0.546325,
+    "total": 1200,
+    "positive": 370,
+    "negative": 830,
+    "correct": 1006,
+    "wrong": 194,
+    "ACC": 0.838333,
+    "Precision": 0.795302,
+    "Recall": 0.640541,
+    "F1": 0.709581,
+    "AUC": 0.865425
+  },
+  "direct_classifier_metrics": {
+    "threshold": 0.865604,
+    "total": 1200,
+    "positive": 370,
+    "negative": 830,
+    "correct": 1001,
+    "wrong": 199,
+    "ACC": 0.834167,
+    "Precision": 0.815498,
+    "Recall": 0.597297,
+    "F1": 0.689548,
+    "AUC": 0.853266
+  }
+}
