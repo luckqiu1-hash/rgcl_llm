@@ -428,11 +428,11 @@ pre: {:.4f} recall: {:.4f} f1: {:.4f}".format(
 
             f.write(test_line)
 
-        acc_ = test_acc_ if args.hybrid_loss else acc
-        if acc_ > best_acc:
+        acc_ = test_f1_ if args.hybrid_loss else acc
+        if acc_ > test_f1_:
             best_epoch = epoch
             print("Current Epoch Acc: ", acc_, "Best model so far, saving...")
-            best_acc = test_acc_
+            best_acc = test_f1_
 
             # Delete the previous best model
             #if best_epoch_path is not None:
@@ -440,7 +440,7 @@ pre: {:.4f} recall: {:.4f} f1: {:.4f}".format(
             #        os.remove(best_epoch_path)
 
             best_epoch_path = args.output_path + \
-                "/ckpt/best_model_{}_{}.pt".format(epoch, str(test_acc_))
+                "/ckpt/best_model_{}_{}.pt".format(epoch, str(test_f1_))
 
             torch.save(
                 model.state_dict(),
