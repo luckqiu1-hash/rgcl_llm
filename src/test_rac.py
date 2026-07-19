@@ -27,7 +27,8 @@ def parse_args():
     parser.add_argument("--path", type=str, default="./data/", help="Dataset root. CLIP_Embedding should be under it.")
     parser.add_argument("--dataset", type=str, default="Toxicn_mm")
     parser.add_argument("--model", type=str, default="clip-vit-large-patch14-336_HF")
-    parser.add_argument("--ckpt_path", "--pth_path", dest="ckpt_path", type=str, default='E:\qxy\code\\rgcl_llm\src\log_toxicn_mm\Retrieval\Toxicn_mm\\best_model.pt',
+    parser.add_argument("--ckpt_path", "--pth_path", dest="ckpt_path", type=str,
+                        default=r"E:\qxy\code\rgcl_llm\src\log_toxicn_mm\Retrieval\Toxicn_mm\best_model.pt",
                         help="Path to trained .pt/.pth checkpoint.")
     parser.add_argument("--split", type=str, default="test_seen", choices=["dev", "test_seen", "test_unseen"],
                         help="Split to evaluate.")
@@ -41,7 +42,10 @@ def parse_args():
     parser.add_argument("--similarity_threshold", type=float, default=-1.0)
     parser.add_argument("--majority_voting", type=str, default="arithmetic", choices=["mean", "arithmetic"])
     parser.add_argument("--decision_threshold", type=float, default=None,
-                        help="Classification threshold on retrieval probability. Default: best threshold on eval split.")
+                        help="Fixed classification threshold. Default: search by --threshold_metric on eval split.")
+    parser.add_argument("--threshold_metric", type=str, default="precision",
+                        choices=["precision", "f1", "acc", "recall"],
+                        help="Metric used to choose threshold when --decision_threshold is not set.")
     parser.add_argument("--metric", type=str, default="cos", choices=["cos", "ip", "l2"])
 
     # Model configs copied from run_rac.py.
@@ -287,20 +291,43 @@ def sigmoid(values):
     return 1.0 / (1.0 + np.exp(-values))
 
 
-def best_accuracy_threshold(probs, labels):
+def best_threshold(probs, labels, metric_name):
     import numpy as np
-    from sklearn.metrics import accuracy_score
+    from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 
     thresholds = np.unique(np.asarray(probs, dtype=float))
     if thresholds.size == 0:
         return 0.5
 
-    best_thr, best_acc = 0.5, -1.0
+    best_thr = 0.5
+    best_key = None
     for threshold in thresholds:
         preds = (probs >= threshold).astype(int)
+        predicted_positive = int(np.sum(preds == 1))
+        if predicted_positive == 0:
+            continue
+
+        precision = precision_score(labels, preds, zero_division=0)
+        recall = recall_score(labels, preds, zero_division=0)
+        f1 = f1_score(labels, preds, zero_division=0)
         acc = accuracy_score(labels, preds)
-        if acc > best_acc:
-            best_thr, best_acc = float(threshold), float(acc)
+
+        if metric_name == "precision":
+            # Maximize precision first; break ties with F1, recall, then ACC
+            # to avoid a degenerate threshold that predicts only a tiny number of positives.
+            key = (precision, f1, recall, acc, -float(threshold))
+        elif metric_name == "f1":
+            key = (f1, precision, recall, acc, -float(threshold))
+        elif metric_name == "recall":
+            key = (recall, f1, precision, acc, -float(threshold))
+        elif metric_name == "acc":
+            key = (acc, f1, precision, recall, -float(threshold))
+        else:
+            raise ValueError(f"Unsupported threshold metric: {metric_name}")
+
+        if best_key is None or key > best_key:
+            best_thr, best_key = float(threshold), key
+
     return best_thr
 
 
@@ -315,6 +342,8 @@ def compute_metric_dict(labels, probs, preds, score_for_auc, threshold):
         "negative": int(np.sum(labels == 0)),
         "correct": int(np.sum(preds == labels)),
         "wrong": int(np.sum(preds != labels)),
+        "predicted_positive": int(np.sum(preds == 1)),
+        "predicted_negative": int(np.sum(preds == 0)),
         "ACC": round(float(accuracy_score(labels, preds)), 6),
         "Precision": round(float(precision_score(labels, preds, zero_division=0)), 6),
         "Recall": round(float(recall_score(labels, preds, zero_division=0)), 6),
@@ -334,7 +363,7 @@ def evaluate_retrieval(records, labels, args):
     probs = sigmoid(scores)
     threshold = args.decision_threshold
     if threshold is None:
-        threshold = best_accuracy_threshold(probs, labels)
+        threshold = best_threshold(probs, labels, args.threshold_metric)
     preds = (probs >= threshold).astype(int)
 
     for record, score, prob, pred in zip(records, scores, probs, preds):
@@ -345,13 +374,13 @@ def evaluate_retrieval(records, labels, args):
     return compute_metric_dict(labels, probs, preds, scores, threshold)
 
 
-def evaluate_direct(logits, labels, decision_threshold):
+def evaluate_direct(logits, labels, args):
     import numpy as np
 
     probs = sigmoid(logits)
-    threshold = decision_threshold
+    threshold = args.decision_threshold
     if threshold is None:
-        threshold = best_accuracy_threshold(probs, labels)
+        threshold = best_threshold(probs, labels, args.threshold_metric)
     preds = (probs >= threshold).astype(int)
     return compute_metric_dict(labels, probs, preds, logits, threshold)
 
@@ -374,6 +403,7 @@ def save_outputs(args, retrieval_metrics, direct_metrics, records):
         "topk": args.topk,
         "similarity_threshold": args.similarity_threshold,
         "majority_voting": args.majority_voting,
+        "threshold_metric": args.threshold_metric,
         "retrieval_metrics": retrieval_metrics,
         "direct_classifier_metrics": direct_metrics,
     }
@@ -477,7 +507,7 @@ def main():
 
     labels_np = eval_labels.numpy().astype(int)
     retrieval_metrics = evaluate_retrieval(records, labels_np, args)
-    direct_metrics = evaluate_direct(eval_logits.numpy(), labels_np, args.decision_threshold)
+    direct_metrics = evaluate_direct(eval_logits.numpy(), labels_np, args)
     metrics_path, csv_path, txt_path = save_outputs(args, retrieval_metrics, direct_metrics, records)
 
     print("\nRetrieval metrics")
