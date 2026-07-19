@@ -132,12 +132,12 @@ def safe_auc(records):
     return wins / (len(pos_scores) * len(neg_scores))
 
 
-def compute_metrics(records):
+def compute_metrics(records, threshold):
     total = len(records)
-    tp = sum(1 for item in records if item["label"] == 1 and item["pred"] == 1)
-    tn = sum(1 for item in records if item["label"] == 0 and item["pred"] == 0)
-    fp = sum(1 for item in records if item["label"] == 0 and item["pred"] == 1)
-    fn = sum(1 for item in records if item["label"] == 1 and item["pred"] == 0)
+    tp = sum(1 for item in records if item["label"] == 1 and item["prob"] >= threshold)
+    tn = sum(1 for item in records if item["label"] == 0 and item["prob"] < threshold)
+    fp = sum(1 for item in records if item["label"] == 0 and item["prob"] >= threshold)
+    fn = sum(1 for item in records if item["label"] == 1 and item["prob"] < threshold)
 
     precision = tp / (tp + fp) if tp + fp else 0.0
     recall = tp / (tp + fn) if tp + fn else 0.0
@@ -145,6 +145,7 @@ def compute_metrics(records):
     acc = (tp + tn) / total if total else 0.0
 
     return {
+        "threshold": threshold,
         "total": total,
         "positive": tp + fn,
         "negative": tn + fp,
@@ -162,14 +163,42 @@ def compute_metrics(records):
     }
 
 
+def find_best_f1_threshold(records):
+    thresholds = sorted({record["prob"] for record in records})
+    if not thresholds:
+        return 0.5
+
+    best_threshold = 0.5
+    best_key = None
+    for threshold in thresholds:
+        metrics = compute_metrics(records, threshold)
+        if metrics["predicted_positive"] == 0:
+            continue
+
+        key = (
+            metrics["F1"],
+            metrics["Precision"],
+            metrics["Recall"],
+            metrics["ACC"],
+            -float(threshold),
+        )
+        if best_key is None or key > best_key:
+            best_threshold = threshold
+            best_key = key
+
+    return best_threshold
+
+
 def evaluate_seeds(records, seeds, test_ratio, stratify):
     rows = []
     for seed in seeds:
         dev_records, test_records = split_records(records, seed, test_ratio, stratify)
-        dev_metrics = compute_metrics(dev_records)
-        test_metrics = compute_metrics(test_records)
+        threshold = find_best_f1_threshold(dev_records)
+        dev_metrics = compute_metrics(dev_records, threshold)
+        test_metrics = compute_metrics(test_records, threshold)
         rows.append({
             "seed": seed,
+            "threshold": threshold,
             "dev_records": dev_records,
             "test_records": test_records,
             "dev_metrics": dev_metrics,
@@ -203,6 +232,7 @@ def write_rows(rows, output_csv):
     os.makedirs(os.path.dirname(os.path.abspath(output_csv)), exist_ok=True)
     fieldnames = [
         "seed",
+        "threshold",
         "dev_size",
         "dev_pos",
         "dev_ACC",
@@ -227,6 +257,7 @@ def write_rows(rows, output_csv):
             test = row["test_metrics"]
             writer.writerow({
                 "seed": row["seed"],
+                "threshold": f'{row["threshold"]:.6f}',
                 "dev_size": dev["total"],
                 "dev_pos": dev["positive"],
                 "dev_ACC": f'{dev["ACC"]:.6f}',
@@ -346,6 +377,8 @@ def write_best_json(args, best_row, split_paths, records):
     payload = {
         "best_seed": best_row["seed"],
         "rank_by": args.rank_by,
+        "threshold_selection": "best_f1_on_dev",
+        "threshold": best_row["threshold"],
         "test_ratio": args.test_ratio,
         "stratify": args.stratify,
         "source_prediction_file": str(Path(args.res_txt).resolve()),
@@ -385,6 +418,7 @@ def main():
     test = payload["test_metrics"]
     print("Best split from existing prediction results")
     print(f"seed: {payload['best_seed']}")
+    print(f"threshold selected on dev F1: {payload['threshold']:.6f}")
     print(f"rank_by: {payload['rank_by']}")
     print(f"dev:  F1={dev['F1']:.6f}, Precision={dev['Precision']:.6f}, Recall={dev['Recall']:.6f}, ACC={dev['ACC']:.6f}, AUC={dev['AUC']:.6f}")
     print(f"test: F1={test['F1']:.6f}, Precision={test['Precision']:.6f}, Recall={test['Recall']:.6f}, ACC={test['ACC']:.6f}, AUC={test['AUC']:.6f}")
