@@ -1,67 +1,124 @@
 import argparse
+import csv
+import json
 import os
 import sys
 from collections import OrderedDict
+from pathlib import Path
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(CURRENT_DIR)
-for module_path in (CURRENT_DIR, ROOT_DIR):
+
+CURRENT_DIR = Path(__file__).resolve().parent
+ROOT_DIR = CURRENT_DIR.parent
+for module_path in (str(CURRENT_DIR), str(ROOT_DIR)):
     if module_path not in sys.path:
         sys.path.insert(0, module_path)
 
 
 def str2bool(value):
-    return str(value).lower() == "true"
+    return str(value).lower() in {"true", "1", "yes", "y"}
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Load a RAC checkpoint and save correct / wrong test predictions."
+        description="Evaluate a RAC checkpoint with Precision, Recall, F1, ACC and AUC."
     )
 
-    parser.add_argument("--pth_path", type=str, default='E:\qxy\code\\rgcl_llm\src\log_toxicn_mm\Retrieval\Toxicn_mm\\best_model.pt', help="Path to the .pth/.pt checkpoint.")
-    parser.add_argument("--save_txt", type=str, default='E:\qxy\code\\rgcl_llm\src\\toixic_mm_res.txt', help="Path to save prediction details txt.")
+    # Data / checkpoint configs. Keep names close to run_rac.py for easy reuse.
     parser.add_argument("--path", type=str, default="./data/", help="Dataset root. CLIP_Embedding should be under it.")
     parser.add_argument("--dataset", type=str, default="Toxicn_mm")
     parser.add_argument("--model", type=str, default="clip-vit-large-patch14-336_HF")
-    parser.add_argument("--split", type=str, default="test_seen", choices=["dev", "test_seen", "test_unseen"])
+    parser.add_argument("--ckpt_path", "--pth_path", dest="ckpt_path", type=str, required=True,
+                        help="Path to trained .pt/.pth checkpoint.")
+    parser.add_argument("--split", type=str, default="test_seen", choices=["dev", "test_seen", "test_unseen"],
+                        help="Split to evaluate.")
+    parser.add_argument("--output_dir", type=str, default="./test_outputs",
+                        help="Directory to save metrics and prediction details.")
+    parser.add_argument("--save_prefix", type=str, default=None,
+                        help="Output filename prefix. Default uses dataset, split and checkpoint name.")
 
-    parser.add_argument("--batch_size", type=int, default=128)
+    # RAC retrieval configs.
     parser.add_argument("--topk", type=int, default=30)
     parser.add_argument("--similarity_threshold", type=float, default=-1.0)
-    parser.add_argument("--majority_voting", type=str, default="mean", choices=["mean", "arithmetic"])
+    parser.add_argument("--majority_voting", type=str, default="arithmetic", choices=["mean", "arithmetic"])
     parser.add_argument("--decision_threshold", type=float, default=None,
-                        help="Class threshold on sigmoid retrieval score. Default: choose best threshold on this split.")
-
+                        help="Classification threshold on retrieval probability. Default: best threshold on eval split.")
     parser.add_argument("--metric", type=str, default="cos", choices=["cos", "ip", "l2"])
-    parser.add_argument("--fusion_mode", type=str, default="concat")
+
+    # Model configs copied from run_rac.py.
+    parser.add_argument("--fusion_mode", type=str, default="align")
     parser.add_argument("--num_layers", type=int, default=3)
     parser.add_argument("--proj_dim", type=int, default=1024)
     parser.add_argument("--map_dim", type=int, default=1024)
-    parser.add_argument("--dropout", type=float, nargs=3, default=[0.1, 0.4, 0.2])
+    parser.add_argument("--dropout", type=float, nargs=3, default=[0.2, 0.4, 0.1])
     parser.add_argument("--batch_norm", type=str2bool, default=False)
-    parser.add_argument("--Faiss_GPU", type=str2bool, default=False)
-    parser.add_argument("--device", type=str, default="cuda")
 
-    # Optional attributes used by classifier_hateClipper if present in trained configs.
+    # Extra model options used by the current classifier.py.
     parser.add_argument("--tf_layers", type=int, default=1)
     parser.add_argument("--tf_heads", type=int, default=4)
     parser.add_argument("--tf_tokens", type=int, default=4)
     parser.add_argument("--tf_dropout", type=float, default=None)
     parser.add_argument("--head_scale", type=float, default=16.0)
+    parser.add_argument("--cf_topk_ratio", type=float, default=0.12)
+    parser.add_argument("--cf_mask_value", type=float, default=0.05)
+    parser.add_argument("--cf_margin", type=float, default=0.23)
+    parser.add_argument("--cf_neg_margin", type=float, default=0.05)
+    parser.add_argument("--use_cf_fusion", type=str2bool, default=False)
+    parser.add_argument("--cf_fuse_scale", type=float, default=0.1)
+
+    parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--num_workers", type=int, default=0)
+    parser.add_argument("--Faiss_GPU", type=str2bool, default=False)
+    parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--seed", type=int, default=0)
+
+    # Training-only arguments accepted for compatibility with run_rac.py command lines.
+    parser.add_argument("--lr", type=float, default=0.0001)
+    parser.add_argument("--epochs", type=int, default=200)
+    parser.add_argument("--loss", type=str, default="triplet")
+    parser.add_argument("--triplet_margin", type=float, default=0.1)
+    parser.add_argument("--norm_feats_loss", type=str2bool, default=False)
+    parser.add_argument("--l2_sqrt", type=str2bool, default=False)
+    parser.add_argument("--hybrid_loss", type=str2bool, default=True)
+    parser.add_argument("--ce_weight", type=float, default=0.5)
+    parser.add_argument("--pos_weight_value", type=float, default=None)
+    parser.add_argument("--weight_decay", type=float, default=0.0001)
+    parser.add_argument("--lr_scheduler", type=str2bool, default=False)
+    parser.add_argument("--grad_clip", type=float, default=0.1)
+    parser.add_argument("--no_pseudo_gold_positives", type=int, default=1)
+    parser.add_argument("--in_batch_loss", type=str2bool, default=True)
+    parser.add_argument("--hard_negatives_loss", type=str2bool, default=True)
+    parser.add_argument("--no_hard_negatives", type=int, default=1)
+    parser.add_argument("--no_hard_positives", type=int, default=0)
+    parser.add_argument("--hard_negatives_multiple", type=int, default=12)
+    parser.add_argument("--reindex_every_step", type=str2bool, default=False)
+    parser.add_argument("--sparse_dictionary", type=str, default=None)
+    parser.add_argument("--use_attribute", type=str2bool, default=True)
+    parser.add_argument("--sparse_topk", type=int, default=None)
+    parser.add_argument("--eval_retrieval", type=str2bool, default=True)
+    parser.add_argument("--log_interval", type=int, default=10)
+    parser.add_argument("--final_eval", type=str2bool, default=False)
+    parser.add_argument("--exp_comment", type=str, default="")
+    parser.add_argument("--group_name", type=str, default="RAC")
+    parser.add_argument("--force", type=str2bool, default=True)
+    parser.add_argument("--output_path", type=str, default=None)
+    parser.add_argument("--output_log", type=str, default=None)
 
     return parser.parse_args()
 
 
 def safe_device(requested_device):
+    import torch
+
     if requested_device.startswith("cuda") and not torch.cuda.is_available():
-        print("CUDA is not available, use CPU instead.")
+        print("CUDA is not available, using CPU instead.")
         return torch.device("cpu")
     return torch.device(requested_device)
 
 
-def load_checkpoint_state(path, device):
-    checkpoint = torch.load(path, map_location=device)
+def load_checkpoint_state(ckpt_path, device):
+    import torch
+
+    checkpoint = torch.load(ckpt_path, map_location=device)
     if isinstance(checkpoint, dict):
         for key in ("state_dict", "model_state_dict", "model"):
             if key in checkpoint and isinstance(checkpoint[key], dict):
@@ -70,31 +127,37 @@ def load_checkpoint_state(path, device):
 
     state_dict = OrderedDict()
     for key, value in checkpoint.items():
-        if key.startswith("module."):
-            key = key[len("module."):]
-        state_dict[key] = value
+        clean_key = key[len("module."):] if key.startswith("module.") else key
+        state_dict[clean_key] = value
     return state_dict
 
 
+def infer_feature_dim(state_dict, dataloader, key, batch_key):
+    import torch
+
+    first_batch = next(iter(dataloader))
+    fallback_dim = first_batch[batch_key].shape[1]
+    weight = state_dict.get(key)
+    if isinstance(weight, torch.Tensor) and weight.ndim == 2:
+        return weight.shape[1]
+    return fallback_dim
+
+
 def build_model(args, train_dl, state_dict):
-    first_batch = next(iter(train_dl))
-    image_feat_dim = first_batch["image_feats"].shape[1]
-    text_feat_dim = first_batch["text_feats"].shape[1]
-    exp_feat_dim = first_batch["exp_feats"].shape[1]
+    from model.classifier import classifier_hateClipper
 
-    # Prefer checkpoint shapes when available, so old checkpoints remain loadable.
-    image_feat_dim = state_dict.get("img_proj.weight", torch.empty(0, image_feat_dim)).shape[1]
-    text_feat_dim = state_dict.get("text_proj.weight", torch.empty(0, text_feat_dim)).shape[1]
-    exp_feat_dim = state_dict.get("exp_proj.weight", torch.empty(0, exp_feat_dim)).shape[1]
+    image_dim = infer_feature_dim(state_dict, train_dl, "img_proj.weight", "image_feats")
+    text_dim = infer_feature_dim(state_dict, train_dl, "text_proj.weight", "text_feats")
+    exp_dim = infer_feature_dim(state_dict, train_dl, "exp_proj.weight", "exp_feats")
 
-    print("Image feature dimension:", image_feat_dim)
-    print("Text feature dimension:", text_feat_dim)
-    print("Explanation feature dimension:", exp_feat_dim)
+    print(f"Image feature dimension: {image_dim}")
+    print(f"Text feature dimension: {text_dim}")
+    print(f"Explanation feature dimension: {exp_dim}")
 
-    model = classifier_hateClipper(
-        image_dim=image_feat_dim,
-        text_dim=text_feat_dim,
-        exp_dim=exp_feat_dim,
+    return classifier_hateClipper(
+        image_dim=image_dim,
+        text_dim=text_dim,
+        exp_dim=exp_dim,
         num_layers=args.num_layers,
         proj_dim=args.proj_dim,
         map_dim=args.map_dim,
@@ -103,185 +166,273 @@ def build_model(args, train_dl, state_dict):
         batch_norm=args.batch_norm,
         args=args,
     )
-    return model
 
 
-def collect_embeddings(dl, model, device, desc):
-    ids = []
-    labels = []
-    logits = []
-    embeds = []
+def collect_outputs(dataloader, model, device, desc):
+    import torch
+    from tqdm import tqdm
 
+    ids, labels, logits, embeds = [], [], [], []
     model.eval()
+
     with torch.no_grad():
-        for batch in tqdm(dl, desc=desc):
-            ids.extend(batch["ids"])
-            out, embed = model(
+        for batch in tqdm(dataloader, desc=desc):
+            ids.extend([str(item) for item in batch["ids"]])
+            output, embed = model(
                 batch["image_feats"].to(device),
                 batch["text_feats"].to(device),
                 batch["exp_feats"].to(device),
                 return_embed=True,
             )
-            labels.append(batch["labels"].detach().cpu())
-            logits.append(out.detach().cpu())
+            labels.append(batch["labels"].detach().cpu().view(-1))
+            logits.append(output.detach().cpu().view(-1))
             embeds.append(embed.detach().cpu())
 
     return ids, torch.cat(labels), torch.cat(logits), torch.cat(embeds)
 
 
-def retrieve(train_ids, train_labels, train_logits, train_embeds, eval_ids, eval_labels,
-             eval_logits, eval_embeds, args):
-    try:
-        import faiss
-    except ModuleNotFoundError as exc:
-        raise ModuleNotFoundError(
-            "faiss is required for RAC retrieval testing. Please run this script in the same "
-            "environment used by run_rac.py, or install faiss-cpu / faiss-gpu."
-        ) from exc
-
-    train_embeds = torch.nn.functional.normalize(train_embeds, p=2, dim=1)
-    eval_embeds = torch.nn.functional.normalize(eval_embeds, p=2, dim=1)
+def build_faiss_index(train_embeds, args):
+    import faiss
+    import torch
 
     dim = train_embeds.shape[1]
-    index = faiss.IndexFlatIP(dim)
-    using_gpu = args.Faiss_GPU and torch.cuda.is_available() and hasattr(faiss, "StandardGpuResources")
-    if using_gpu:
+    if args.metric == "l2":
+        index = faiss.IndexFlatL2(dim)
+        vectors = train_embeds.numpy().astype("float32")
+    elif args.metric == "ip":
+        index = faiss.IndexFlatIP(dim)
+        vectors = train_embeds.numpy().astype("float32")
+    else:
+        index = faiss.IndexFlatIP(dim)
+        vectors = torch.nn.functional.normalize(train_embeds, p=2, dim=1).numpy().astype("float32")
+
+    return index, vectors
+
+
+def search_neighbors(train_embeds, eval_embeds, args):
+    import faiss
+    import torch
+
+    index, train_vectors = build_faiss_index(train_embeds, args)
+    if args.metric == "cos":
+        eval_vectors = torch.nn.functional.normalize(eval_embeds, p=2, dim=1).numpy().astype("float32")
+    else:
+        eval_vectors = eval_embeds.numpy().astype("float32")
+
+    use_gpu = args.Faiss_GPU and hasattr(faiss, "StandardGpuResources")
+    if use_gpu:
         res = faiss.StandardGpuResources()
         index = faiss.index_cpu_to_gpu(res, 0, index)
-        index.add(train_embeds.cuda())
-        distances, indices = index.search(eval_embeds.cuda(), args.topk)
-        distances = distances.cpu().numpy()
-        indices = indices.cpu().numpy()
-    else:
-        index.add(train_embeds.numpy().astype("float32"))
-        distances, indices = index.search(eval_embeds.numpy().astype("float32"), args.topk)
 
+    index.add(train_vectors)
+    return index.search(eval_vectors, args.topk)
+
+
+def keep_retrieved_item(rank, score, threshold):
+    # Matches the threshold behavior in model/evaluate_rac.py.
+    return rank == 0 or threshold == -1 or score < threshold
+
+
+def make_records(train_ids, train_labels, train_logits, eval_ids, eval_labels, eval_logits, distances, indices, args):
     records = []
     for row_idx, row_scores in enumerate(distances):
         retrieved = []
         for rank, score in enumerate(row_scores):
-            train_idx = int(indices[row_idx, rank])
-            if rank == 0 or score < args.similarity_threshold or args.similarity_threshold == -1:
-                retrieved.append({
-                    "id": str(train_ids[train_idx]),
-                    "score": float(score),
-                    "label": int(train_labels[train_idx].item()),
-                    "logit": float(train_logits[train_idx].view(-1)[0].item()),
-                })
-            else:
+            if not keep_retrieved_item(rank, float(score), args.similarity_threshold):
                 break
 
+            train_idx = int(indices[row_idx, rank])
+            retrieved.append({
+                "rank": rank + 1,
+                "id": train_ids[train_idx],
+                "label": int(train_labels[train_idx].item()),
+                "similarity": float(score),
+                "logit": float(train_logits[train_idx].item()),
+            })
+
         records.append({
-            "id": str(eval_ids[row_idx]),
+            "id": eval_ids[row_idx],
             "label": int(eval_labels[row_idx].item()),
-            "eval_logit": float(eval_logits[row_idx].view(-1)[0].item()),
+            "direct_logit": float(eval_logits[row_idx].item()),
             "retrieved": retrieved,
         })
     return records
 
 
+def retrieval_scores(records, voting, topk):
+    import numpy as np
+
+    scores = []
+    weights = np.arange(1, topk + 1)[::-1]
+    for record in records:
+        labels = np.array([item["label"] for item in record["retrieved"]], dtype=float)
+        sims = np.array([item["similarity"] for item in record["retrieved"]], dtype=float)
+        signed_sims = (labels * 2.0 - 1.0) * sims
+
+        if voting == "mean":
+            score = float(np.mean(signed_sims))
+        elif voting == "arithmetic":
+            length = len(signed_sims)
+            score = float(np.sum(signed_sims * weights[:length]) / np.sum(weights[:length]))
+        else:
+            raise ValueError(f"Unsupported majority voting method: {voting}")
+
+        scores.append(score)
+    return np.asarray(scores, dtype=float)
+
+
 def sigmoid(values):
+    import numpy as np
+
     return 1.0 / (1.0 + np.exp(-values))
 
 
-def score_records(records, majority_voting, topk):
-    scores = []
-    if majority_voting == "arithmetic":
-        weights = np.arange(1, topk + 1)[::-1]
+def best_accuracy_threshold(probs, labels):
+    import numpy as np
+    from sklearn.metrics import accuracy_score
 
-    for record in records:
-        retrieved_labels = np.array([item["label"] for item in record["retrieved"]])
-        retrieved_scores = np.array([item["score"] for item in record["retrieved"]])
-        label_sign = retrieved_labels * 2 - 1
-        weighted_values = label_sign * retrieved_scores
+    thresholds = np.unique(np.asarray(probs, dtype=float))
+    if thresholds.size == 0:
+        return 0.5
 
-        if majority_voting == "mean":
-            scores.append(float(np.mean(weighted_values)))
-        elif majority_voting == "arithmetic":
-            length = len(weighted_values)
-            scores.append(float(np.sum(weighted_values * weights[:length]) / np.sum(weights[:length])))
-        else:
-            raise ValueError("Unsupported majority voting method.")
-
-    return np.array(scores)
-
-
-def best_threshold(scores, labels):
-    thresholds = np.linspace(0, 1, 1001)
-    best_thr = 0.5
-    best_acc = -1.0
+    best_thr, best_acc = 0.5, -1.0
     for threshold in thresholds:
-        preds = (scores >= threshold).astype(int)
+        preds = (probs >= threshold).astype(int)
         acc = accuracy_score(labels, preds)
         if acc > best_acc:
-            best_acc = acc
-            best_thr = threshold
+            best_thr, best_acc = float(threshold), float(acc)
     return best_thr
 
 
-def save_predictions(records, output_path, metrics):
-    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
-    correct = [record for record in records if record["pred"] == record["label"]]
-    wrong = [record for record in records if record["pred"] != record["label"]]
+def compute_metric_dict(labels, probs, preds, score_for_auc, threshold):
+    import numpy as np
+    from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
 
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write("RAC test prediction results\n")
-        for key, value in metrics.items():
-            f.write(f"{key}: {value}\n")
-        f.write("\n")
+    metrics = {
+        "threshold": round(float(threshold), 6),
+        "total": int(len(labels)),
+        "positive": int(np.sum(labels == 1)),
+        "negative": int(np.sum(labels == 0)),
+        "correct": int(np.sum(preds == labels)),
+        "wrong": int(np.sum(preds != labels)),
+        "ACC": round(float(accuracy_score(labels, preds)), 6),
+        "Precision": round(float(precision_score(labels, preds, zero_division=0)), 6),
+        "Recall": round(float(recall_score(labels, preds, zero_division=0)), 6),
+        "F1": round(float(f1_score(labels, preds, zero_division=0)), 6),
+    }
 
-        f.write(f"===== CORRECT ({len(correct)}) =====\n")
-        for record in correct:
-            write_record(f, record)
+    try:
+        metrics["AUC"] = round(float(roc_auc_score(labels, score_for_auc)), 6)
+    except ValueError:
+        metrics["AUC"] = None
 
-        f.write(f"\n===== WRONG ({len(wrong)}) =====\n")
-        for record in wrong:
-            write_record(f, record)
+    return metrics
 
 
-def write_record(f, record):
-    f.write(
-        "id={id}\tlabel={label}\tpred={pred}\tprob={prob:.6f}\tscore={score:.6f}\t"
-        "eval_logit={eval_logit:.6f}\tno_retrieved={no_retrieved}\n".format(
-            id=record["id"],
-            label=record["label"],
-            pred=record["pred"],
-            prob=record["prob"],
-            score=record["score"],
-            eval_logit=record["eval_logit"],
-            no_retrieved=len(record["retrieved"]),
+def evaluate_retrieval(records, labels, args):
+    scores = retrieval_scores(records, args.majority_voting, args.topk)
+    probs = sigmoid(scores)
+    threshold = args.decision_threshold
+    if threshold is None:
+        threshold = best_accuracy_threshold(probs, labels)
+    preds = (probs >= threshold).astype(int)
+
+    for record, score, prob, pred in zip(records, scores, probs, preds):
+        record["retrieval_score"] = float(score)
+        record["retrieval_prob"] = float(prob)
+        record["pred"] = int(pred)
+
+    return compute_metric_dict(labels, probs, preds, scores, threshold)
+
+
+def evaluate_direct(logits, labels, decision_threshold):
+    import numpy as np
+
+    probs = sigmoid(logits)
+    threshold = decision_threshold
+    if threshold is None:
+        threshold = best_accuracy_threshold(probs, labels)
+    preds = (probs >= threshold).astype(int)
+    return compute_metric_dict(labels, probs, preds, logits, threshold)
+
+
+def save_outputs(args, retrieval_metrics, direct_metrics, records):
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    ckpt_stem = Path(args.ckpt_path).stem
+    prefix = args.save_prefix or f"{args.dataset}_{args.split}_{ckpt_stem}"
+    metrics_path = output_dir / f"{prefix}_metrics.json"
+    csv_path = output_dir / f"{prefix}_predictions.csv"
+    txt_path = output_dir / f"{prefix}_details.txt"
+
+    payload = {
+        "checkpoint": str(Path(args.ckpt_path).resolve()),
+        "dataset": args.dataset,
+        "split": args.split,
+        "model": args.model,
+        "topk": args.topk,
+        "similarity_threshold": args.similarity_threshold,
+        "majority_voting": args.majority_voting,
+        "retrieval_metrics": retrieval_metrics,
+        "direct_classifier_metrics": direct_metrics,
+    }
+    metrics_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    with csv_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "id", "label", "pred", "retrieval_prob", "retrieval_score",
+                "direct_logit", "no_retrieved", "retrieved_ids",
+                "retrieved_labels", "retrieved_similarities",
+            ],
         )
-    )
-    retrieved_text = "; ".join(
-        "rank{}:{}|label={}|sim={:.6f}|logit={:.6f}".format(
-            rank + 1,
-            item["id"],
-            item["label"],
-            item["score"],
-            item["logit"],
-        )
-        for rank, item in enumerate(record["retrieved"])
-    )
-    f.write(f"retrieved={retrieved_text}\n\n")
+        writer.writeheader()
+        for record in records:
+            writer.writerow({
+                "id": record["id"],
+                "label": record["label"],
+                "pred": record["pred"],
+                "retrieval_prob": record["retrieval_prob"],
+                "retrieval_score": record["retrieval_score"],
+                "direct_logit": record["direct_logit"],
+                "no_retrieved": len(record["retrieved"]),
+                "retrieved_ids": "|".join(item["id"] for item in record["retrieved"]),
+                "retrieved_labels": "|".join(str(item["label"]) for item in record["retrieved"]),
+                "retrieved_similarities": "|".join(f"{item['similarity']:.6f}" for item in record["retrieved"]),
+            })
+
+    with txt_path.open("w", encoding="utf-8") as f:
+        f.write("RAC test results\n")
+        f.write(json.dumps(payload, ensure_ascii=False, indent=2))
+        f.write("\n\nWrong predictions\n")
+        wrong_records = [record for record in records if record["pred"] != record["label"]]
+        for record in wrong_records:
+            f.write(
+                f"id={record['id']}\tlabel={record['label']}\tpred={record['pred']}\t"
+                f"prob={record['retrieval_prob']:.6f}\tscore={record['retrieval_score']:.6f}\n"
+            )
+            retrieved = "; ".join(
+                f"rank{item['rank']}:{item['id']}|label={item['label']}|sim={item['similarity']:.6f}"
+                for item in record["retrieved"]
+            )
+            f.write(f"retrieved={retrieved}\n\n")
+
+    return metrics_path, csv_path, txt_path
 
 
 def main():
     args = parse_args()
 
-    global np
-    global torch
-    global accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
-    global tqdm
-    global load_feats_from_CLIP, CLIP2Dataloader, classifier_hateClipper
-
     import numpy as np
     import torch
-    from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
-    from tqdm import tqdm
 
     from data_loader.dataset import load_feats_from_CLIP
     from data_loader.rac_dataloader import CLIP2Dataloader
-    from model.classifier import classifier_hateClipper
+
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
 
     device = safe_device(args.device)
     args.device = str(device)
@@ -290,78 +441,57 @@ def main():
 
     if args.dataset == "FB":
         train, dev, test_seen, test_unseen = load_feats_from_CLIP(
-            os.path.join(args.path, "CLIP_Embedding"), "FB", args.model
+            os.path.join(args.path, "CLIP_Embedding"), args.dataset, args.model
         )
-        datasets = {"dev": dev, "test_seen": test_seen, "test_unseen": test_unseen}
+        split_map = {"dev": dev, "test_seen": test_seen, "test_unseen": test_unseen}
     else:
         if args.split == "test_unseen":
-            raise ValueError("--split test_unseen is only available for FB dataset.")
+            raise ValueError("--split test_unseen is only supported for FB dataset.")
         train, dev, test_seen = load_feats_from_CLIP(
             os.path.join(args.path, "CLIP_Embedding"), args.dataset, args.model
         )
-        datasets = {"dev": dev, "test_seen": test_seen}
+        split_map = {"dev": dev, "test_seen": test_seen}
 
     train_dl, eval_dl = CLIP2Dataloader(
         train,
-        datasets[args.split],
+        split_map[args.split],
         batch_size=args.batch_size,
         return_dataset=False,
         normalize=False,
     )
 
-    state_dict = load_checkpoint_state(args.pth_path, device)
+    state_dict = load_checkpoint_state(args.ckpt_path, device)
     model = build_model(args, train_dl, state_dict)
     model.load_state_dict(state_dict, strict=True)
     model.to(device)
 
-    train_ids, train_labels, train_logits, train_embeds = collect_embeddings(
-        train_dl, model, device, "Encode train"
-    )
-    eval_ids, eval_labels, eval_logits, eval_embeds = collect_embeddings(
-        eval_dl, model, device, f"Encode {args.split}"
+    train_ids, train_labels, train_logits, train_embeds = collect_outputs(train_dl, model, device, "Encode train")
+    eval_ids, eval_labels, eval_logits, eval_embeds = collect_outputs(eval_dl, model, device, f"Encode {args.split}")
+
+    distances, indices = search_neighbors(train_embeds, eval_embeds, args)
+    records = make_records(
+        train_ids, train_labels, train_logits,
+        eval_ids, eval_labels, eval_logits,
+        distances, indices, args,
     )
 
-    records = retrieve(
-        train_ids, train_labels, train_logits, train_embeds,
-        eval_ids, eval_labels, eval_logits, eval_embeds,
-        args,
-    )
-    raw_scores = score_records(records, args.majority_voting, args.topk)
-    probs = sigmoid(raw_scores)
     labels_np = eval_labels.numpy().astype(int)
-    threshold = args.decision_threshold
-    if threshold is None:
-        threshold = best_threshold(probs, labels_np)
-    preds = (probs >= threshold).astype(int)
+    retrieval_metrics = evaluate_retrieval(records, labels_np, args)
+    direct_metrics = evaluate_direct(eval_logits.numpy(), labels_np, args.decision_threshold)
+    metrics_path, csv_path, txt_path = save_outputs(args, retrieval_metrics, direct_metrics, records)
 
-    for record, score, prob, pred in zip(records, raw_scores, probs, preds):
-        record["score"] = float(score)
-        record["prob"] = float(prob)
-        record["pred"] = int(pred)
-
-    metrics = {
-        "checkpoint": os.path.abspath(args.pth_path),
-        "dataset": args.dataset,
-        "split": args.split,
-        "topk": args.topk,
-        "similarity_threshold": args.similarity_threshold,
-        "majority_voting": args.majority_voting,
-        "decision_threshold": round(float(threshold), 6),
-        "total": len(records),
-        "correct": int(np.sum(preds == labels_np)),
-        "wrong": int(np.sum(preds != labels_np)),
-        "acc": round(float(accuracy_score(labels_np, preds)), 6),
-        "roc": round(float(roc_auc_score(labels_np, raw_scores)), 6),
-        "precision": round(float(precision_score(labels_np, preds, zero_division=0)), 6),
-        "recall": round(float(recall_score(labels_np, preds, zero_division=0)), 6),
-        "f1": round(float(f1_score(labels_np, preds, zero_division=0)), 6),
-    }
-    save_predictions(records, args.save_txt, metrics)
-
-    print("Test finished.")
-    for key, value in metrics.items():
+    print("\nRetrieval metrics")
+    for key, value in retrieval_metrics.items():
         print(f"{key}: {value}")
-    print("Saved prediction details to:", os.path.abspath(args.save_txt))
+
+    print("\nDirect classifier metrics")
+    for key, value in direct_metrics.items():
+        print(f"{key}: {value}")
+
+    print("\nSaved files")
+    print(f"metrics: {metrics_path.resolve()}")
+    print(f"predictions: {csv_path.resolve()}")
+    print(f"details: {txt_path.resolve()}")
 
 
 if __name__ == "__main__":
