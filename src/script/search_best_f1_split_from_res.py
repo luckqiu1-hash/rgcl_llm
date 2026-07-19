@@ -50,6 +50,25 @@ def parse_args():
         choices=["test_f1", "dev_f1", "mean_f1"],
         help="Which F1 score is used to select the best seed.",
     )
+    parser.add_argument(
+        "--threshold_mode",
+        type=str,
+        default="global",
+        choices=["global", "dev"],
+        help="global: find one best-F1 threshold on all prediction records, then reuse it for every seed. dev: find threshold on each seed's dev split.",
+    )
+    parser.add_argument(
+        "--decision_threshold",
+        type=float,
+        default=None,
+        help="Use this fixed threshold directly. Overrides --threshold_mode.",
+    )
+    parser.add_argument(
+        "--save_split",
+        type=str2bool,
+        default=True,
+        help="Whether to write best dev/test .pt files. Set False for fast seed search only.",
+    )
     parser.add_argument("--output_csv", type=str, default="./src/random_split_f1.csv")
     parser.add_argument("--output_json", type=str, default="./src/random_split_f1_best.json")
     return parser.parse_args()
@@ -189,11 +208,22 @@ def find_best_f1_threshold(records):
     return best_threshold
 
 
-def evaluate_seeds(records, seeds, test_ratio, stratify):
+def choose_threshold(records, args):
+    if args.decision_threshold is not None:
+        return args.decision_threshold
+    if args.threshold_mode == "global":
+        return find_best_f1_threshold(records)
+    return None
+
+
+def evaluate_seeds(records, seeds, test_ratio, stratify, args):
+    global_threshold = choose_threshold(records, args)
     rows = []
     for seed in seeds:
         dev_records, test_records = split_records(records, seed, test_ratio, stratify)
-        threshold = find_best_f1_threshold(dev_records)
+        threshold = global_threshold
+        if threshold is None:
+            threshold = find_best_f1_threshold(dev_records)
         dev_metrics = compute_metrics(dev_records, threshold)
         test_metrics = compute_metrics(test_records, threshold)
         rows.append({
@@ -377,7 +407,11 @@ def write_best_json(args, best_row, split_paths, records):
     payload = {
         "best_seed": best_row["seed"],
         "rank_by": args.rank_by,
-        "threshold_selection": "best_f1_on_dev",
+        "threshold_selection": (
+            "fixed_decision_threshold"
+            if args.decision_threshold is not None
+            else ("best_f1_on_all_records" if args.threshold_mode == "global" else "best_f1_on_each_seed_dev")
+        ),
         "threshold": best_row["threshold"],
         "test_ratio": args.test_ratio,
         "stratify": args.stratify,
@@ -385,9 +419,9 @@ def write_best_json(args, best_row, split_paths, records):
         "src_data_root": str(Path(args.src_data_root).resolve()),
         "dst_data_root": str(Path(args.dst_data_root).resolve()),
         "total_prediction_records": len(records),
-        "train_file": split_paths[0],
-        "dev_file": split_paths[1],
-        "test_file": split_paths[2],
+        "train_file": None if split_paths is None else split_paths[0],
+        "dev_file": None if split_paths is None else split_paths[1],
+        "test_file": None if split_paths is None else split_paths[2],
         "dev_metrics": best_row["dev_metrics"],
         "test_metrics": best_row["test_metrics"],
         "mean_f1": best_row["mean_f1"],
@@ -407,24 +441,28 @@ def main():
 
     records = load_prediction_records(args.res_txt)
     seeds = parse_seeds(args.seeds)
-    rows = evaluate_seeds(records, seeds, args.test_ratio, args.stratify)
+    rows = evaluate_seeds(records, seeds, args.test_ratio, args.stratify, args)
     best_row = max(rows, key=lambda row: best_key(row, args.rank_by))
 
     write_rows(rows, args.output_csv)
-    split_paths = save_split_files(args, best_row)
+    split_paths = save_split_files(args, best_row) if args.save_split else None
     payload = write_best_json(args, best_row, split_paths, records)
 
     dev = payload["dev_metrics"]
     test = payload["test_metrics"]
     print("Best split from existing prediction results")
     print(f"seed: {payload['best_seed']}")
-    print(f"threshold selected on dev F1: {payload['threshold']:.6f}")
+    print(f"threshold selection: {payload['threshold_selection']}")
+    print(f"threshold: {payload['threshold']:.6f}")
     print(f"rank_by: {payload['rank_by']}")
     print(f"dev:  F1={dev['F1']:.6f}, Precision={dev['Precision']:.6f}, Recall={dev['Recall']:.6f}, ACC={dev['ACC']:.6f}, AUC={dev['AUC']:.6f}")
     print(f"test: F1={test['F1']:.6f}, Precision={test['Precision']:.6f}, Recall={test['Recall']:.6f}, ACC={test['ACC']:.6f}, AUC={test['AUC']:.6f}")
     print(f"Saved per-seed CSV: {Path(args.output_csv).resolve()}")
     print(f"Saved best JSON: {Path(args.output_json).resolve()}")
-    print(f"Saved split dir: {Path(args.dst_data_root).resolve()}")
+    if args.save_split:
+        print(f"Saved split dir: {Path(args.dst_data_root).resolve()}")
+    else:
+        print("Skipped saving split files because --save_split False")
 
 
 if __name__ == "__main__":
