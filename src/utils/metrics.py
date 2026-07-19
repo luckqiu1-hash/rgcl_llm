@@ -238,6 +238,44 @@ def find_best_acc_threshold(scores, labels):
 
     return best_thr, best_acc
 
+
+def find_best_f1_threshold(scores, labels, average="macro"):
+    """
+    scores: probability scores, shape [N]
+    labels: binary labels, shape [N]
+    average: "macro" for paper-style macro F1, or "binary" for positive-class F1.
+    """
+    scores = np.asarray(scores).reshape(-1)
+    labels = np.asarray(labels).astype(int).reshape(-1)
+    thresholds = np.unique(scores)
+
+    best_thr = 0.5
+    best_f1 = -1.0
+
+    for thr in thresholds:
+        preds = (scores >= thr).astype(int)
+        f1 = f1_score(labels, preds, average=average, zero_division=0)
+
+        if f1 > best_f1:
+            best_f1 = f1
+            best_thr = thr
+
+    return best_thr, best_f1
+
+
+def compute_binary_macro_metrics(labels, scores, threshold):
+    labels = np.asarray(labels).astype(int).reshape(-1)
+    scores = np.asarray(scores).reshape(-1)
+    preds = (scores >= threshold).astype(int)
+
+    acc = accuracy_score(labels, preds)
+    roc = roc_auc_score(labels, scores)
+    macro_pre = precision_score(labels, preds, average="macro", zero_division=0)
+    macro_recall = recall_score(labels, preds, average="macro", zero_division=0)
+    macro_f1 = f1_score(labels, preds, average="macro", zero_division=0)
+
+    return acc, roc, macro_pre, macro_recall, macro_f1, preds
+
 def compute_metrics_retrieval(logging_dict, labels, majority_voting="mean", topk=0, use_prob=False, use_sim=False):
     """
     # Loop through the logging_dict to get the retrieved labels
@@ -314,16 +352,16 @@ def compute_metrics_retrieval(logging_dict, labels, majority_voting="mean", topk
     else:
         roc = roc_auc_score(labels, list_majority_voted_prob)
     if not use_sim:
-        list_majority_voted_round = (np.array(list_majority_voted)>=0.5)*1
+        scores_for_cls = np.array(list_majority_voted)
     else:
         # list_majority_voted_round = (sigmoid(np.array(list_majority_voted))>=0.5)*1
         scores_for_cls = sigmoid(np.array(list_majority_voted))
-    best_thr, best_acc = find_best_acc_threshold(scores_for_cls, labels)
+    best_thr, best_f1 = find_best_f1_threshold(scores_for_cls, labels, average="macro")
     list_majority_voted_round = (scores_for_cls >= best_thr).astype(int)
     acc = np.mean(list_majority_voted_round == labels)
-    pre = precision_score(labels, list_majority_voted_round)
-    recall = recall_score(labels, list_majority_voted_round)
-    f1 = f1_score(labels, list_majority_voted_round)    
+    pre = precision_score(labels, list_majority_voted_round, average="macro", zero_division=0)
+    recall = recall_score(labels, list_majority_voted_round, average="macro", zero_division=0)
+    f1 = f1_score(labels, list_majority_voted_round, average="macro", zero_division=0)    
     
     #print("accuracy:",acc)
     #print("AUROC:", roc)
@@ -432,29 +470,12 @@ def find_best_threshold(probs, labels):
     probs: sigmoid 后的概率, shape [N] / [N, 1] / [N, C]
     labels: 真实标签, shape 同 probs
     """
-    if len(labels.shape) == 1:
-        labels = labels.unsqueeze(1)
+    probs_np = probs.detach().cpu().numpy().reshape(-1)
+    labels_np = labels.detach().cpu().numpy().astype(int).reshape(-1)
 
-    if len(probs.shape) == 1:
-        probs = probs.unsqueeze(1)
+    best_threshold, best_f1 = find_best_f1_threshold(probs_np, labels_np, average="macro")
 
-    labels = labels.long()
-
-    best_threshold = 0.5
-    best_acc = -1.0
-
-    thresholds = torch.arange(0.01, 1.00, 0.01, device=probs.device)
-
-    for threshold in thresholds:
-        preds = (probs >= threshold).long()
-
-        acc = (preds == labels).float().mean().item()
-
-        if acc > best_acc:
-            best_acc = acc
-            best_threshold = threshold.item()
-
-    return best_threshold, best_acc
+    return best_threshold, best_f1
 
 def eval_metrics(args, labels, predicted, name="dev_seen", epoch=0, compute_loss=True, print_score=True):
     if len(labels.shape) == 1:
@@ -469,22 +490,25 @@ def eval_metrics(args, labels, predicted, name="dev_seen", epoch=0, compute_loss
         #TODO
     
     elif args.dataset != "Propaganda":
-        ACCURACY = torchmetrics.Accuracy(task='binary')
-        AUROC = torchmetrics.AUROC(task='binary')
-        PRECISION = torchmetrics.Precision(task='binary')
-        RECALL = torchmetrics.Recall(task='binary')
-        F1Score = torchmetrics.F1Score(task='binary')
+        labels_np = labels.detach().cpu().numpy().astype(int).reshape(-1)
+        probs_np = preds_proxy.detach().cpu().numpy().reshape(-1)
+        preds_np = preds.detach().cpu().numpy().astype(int).reshape(-1)
+        acc = accuracy_score(labels_np, preds_np)
+        roc = roc_auc_score(labels_np, probs_np)
+        pre = precision_score(labels_np, preds_np, average="macro", zero_division=0)
+        recall = recall_score(labels_np, preds_np, average="macro", zero_division=0)
+        f1 = f1_score(labels_np, preds_np, average="macro", zero_division=0)
     else:
         ACCURACY = torchmetrics.Accuracy(task="multilabel", num_labels=22, average='micro')
         AUROC = torchmetrics.AUROC(task="multilabel", num_labels=22, average='micro')
         PRECISION = torchmetrics.Precision(task="multilabel", num_labels=22, average='micro')
         RECALL = torchmetrics.Recall(task="multilabel", num_labels=22, average='micro')
         F1Score = torchmetrics.F1Score(task="multilabel", num_labels=22, average='micro')
-    acc = ACCURACY(preds, labels)
-    roc = AUROC(preds_proxy, labels)
-    pre = PRECISION(preds, labels)
-    recall = RECALL(preds, labels)
-    f1 = F1Score(preds, labels)
+        acc = ACCURACY(preds, labels)
+        roc = AUROC(preds_proxy, labels)
+        pre = PRECISION(preds, labels)
+        recall = RECALL(preds, labels)
+        f1 = F1Score(preds, labels)
     
     if compute_loss:
         lossFn_classifier = nn.BCEWithLogitsLoss()

@@ -23,12 +23,12 @@ def parse_args():
 
     # <----------------- Data Configs ----------------->
     arg_parser.add_argument(
-        "--path", type=str, default="E:\qxy\code\\rgcl_llm\src\data/")
+        "--path", type=str, default=r"E:\qxy\code\rgcl_llm\src\data/")
     arg_parser.add_argument(
-        "--output_path", type=str, default="E:\qxy\code\\rgcl_llm\src\log_toxicn_mm/"
+        "--output_path", type=str, default=r"E:\qxy\code\rgcl_llm\src\log_toxicn_mm/"
     )
     arg_parser.add_argument(
-        "--output_log", type=str, default="E:\qxy\code\\rgcl_llm\src\log_toxicn_mm.txt"
+        "--output_log", type=str, default=r"E:\qxy\code\rgcl_llm\src\log_toxicn_mm.txt"
     )
     arg_parser.add_argument("--model", type=str, default="")
 
@@ -364,9 +364,17 @@ def model_pass(
 
         if args.hybrid_loss:
             # logging at the end of each epoch
-            (acc_, roc_, pre_, recall_, f1_, eval_loss_), (test_acc_, test_roc_, _, _, _) = eval_and_save_epoch_end(
+            (acc_, roc_, pre_, recall_, f1_, eval_loss_), (test_acc_, test_roc_, test_pre_, test_recall_, test_f1_) = eval_and_save_epoch_end(
                 args, artifacts, train_dl, evaluate_dl, test_seen_dl, model, epoch)
-
+        else:
+            acc_, roc_, pre_, recall_, f1_ = acc, roc, pre, recall, f1
+            test_acc_, test_roc_, test_pre_, test_recall_, test_f1_ = (
+                acc_test,
+                roc_test,
+                pre_test,
+                recall_test,
+                f1_test,
+            )
 
             
         # Print out the summary of the epoch
@@ -398,8 +406,24 @@ pre: {:.4f} recall: {:.4f} f1: {:.4f}".format(
 
         with open(args.output_log, "a", encoding="utf-8") as f:
             # 写入Test指标
-            test_line = "Test Epoch {} val_acc: {:.4f} val_roc: {:.4f} test_acc: {:.4f} test_roc: {:.4f}\n".format(
-                epoch, acc_, roc_, test_acc_, test_roc_
+            test_line = (
+                "Test Epoch {} "
+                "val_acc: {:.4f} val_auc: {:.4f} val_macro_precision: {:.4f} "
+                "val_macro_recall: {:.4f} val_macro_f1: {:.4f} "
+                "test_acc: {:.4f} test_auc: {:.4f} test_macro_precision: {:.4f} "
+                "test_macro_recall: {:.4f} test_macro_f1: {:.4f}\n"
+            ).format(
+                epoch,
+                acc_,
+                roc_,
+                pre_,
+                recall_,
+                f1_,
+                test_acc_,
+                test_roc_,
+                test_pre_,
+                test_recall_,
+                test_f1_,
             )
 
             f.write(test_line)
