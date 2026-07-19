@@ -62,6 +62,10 @@ def ordered_models(stats):
     return preferred + [model for model in stats if model not in preferred]
 
 
+def display_model(model):
+    return "with_cf" if model == "full" else model
+
+
 def svg_text(x, y, text, size=16, weight="400", color="#1f2937", anchor="start"):
     return (
         f'<text x="{x:.1f}" y="{y:.1f}" font-family="Arial, Helvetica, sans-serif" '
@@ -129,7 +133,7 @@ def make_svg(stats, output_svg, show_takeaway=False):
         y = row_y.get(model, 170 + 100 * models.index(model))
         c = colors.get(model, "#059669")
         lc = light.get(model, "#bbf7d0")
-        parts.append(svg_text(42, y + 5, model, 15, "600", ink))
+        parts.append(svg_text(42, y + 5, display_model(model), 15, "600", ink))
         parts.append(svg_line(xmap(s["p10"]), y, xmap(s["p90"]), y, lc, 8))
         parts.append(svg_rect(xmap(s["p25"]), y - 19, xmap(s["p75"]) - xmap(s["p25"]), 38, lc, "none", radius=8))
         parts.append(svg_line(xmap(s["median"]), y - 25, xmap(s["median"]), y + 25, c, 3))
@@ -155,14 +159,14 @@ def make_svg(stats, output_svg, show_takeaway=False):
             yy = y + 15 + j * 28
             x_end = bx0 + min(val / max_axis, 1.0) * (bx1 - bx0)
             parts.append(svg_rect(bx0, yy, x_end - bx0, 18, c, radius=5))
-            parts.append(svg_text(588, yy + 14, model, 13, "400", muted))
+            parts.append(svg_text(588, yy + 14, display_model(model), 13, "400", muted))
             parts.append(svg_text(x_end + 8, yy + 14, f"{val:.3f}", 13, "700", c))
 
     # Compact takeaway.
     if show_takeaway and "full" in stats and "no_cf" in stats and stats["no_cf"]["mean"] != 0:
         ratio = stats["full"]["mean"] / stats["no_cf"]["mean"]
         takeaway = (
-            f"Full shows {ratio:.1f}x larger mean drop "
+            f"with_cf shows {ratio:.1f}x larger mean drop "
             f"({stats['full']['mean']:.3f} vs {stats['no_cf']['mean']:.3f}) "
             f"and higher drop rate ({stats['full']['drop_rate']:.3f} vs {stats['no_cf']['drop_rate']:.3f})."
         )
@@ -237,7 +241,7 @@ def make_png(stats, output_png, show_takeaway=False):
         y = row_y.get(model, 170 + 100 * models.index(model))
         c = colors.get(model, (5, 150, 105))
         lc = light.get(model, (187, 247, 208))
-        text(42, y + 5, model, 15, ink, True)
+        text(42, y + 5, display_model(model), 15, ink, True)
         line(xmap(st["p10"]), y, xmap(st["p90"]), y, lc, 8)
         rect(xmap(st["p25"]), y - 19, xmap(st["p75"]) - xmap(st["p25"]), 38, lc, 8)
         line(xmap(st["median"]), y - 25, xmap(st["median"]), y + 25, c, 3)
@@ -258,12 +262,12 @@ def make_png(stats, output_png, show_takeaway=False):
             yy = y + 15 + j * 28
             x_end = bx0 + min(val / max_axis, 1.0) * (bx1 - bx0)
             rect(bx0, yy, x_end - bx0, 18, c, 5)
-            text(588, yy + 14, model, 13, muted)
+            text(588, yy + 14, display_model(model), 13, muted)
             text(x_end + 8, yy + 14, f"{val:.3f}", 13, c, True)
 
     if show_takeaway and "full" in stats and "no_cf" in stats and stats["no_cf"]["mean"] != 0:
         ratio = stats["full"]["mean"] / stats["no_cf"]["mean"]
-        takeaway = f"Full shows {ratio:.1f}x larger mean drop ({stats['full']['mean']:.3f} vs {stats['no_cf']['mean']:.3f}) and higher drop rate ({stats['full']['drop_rate']:.3f} vs {stats['no_cf']['drop_rate']:.3f})."
+        takeaway = f"with_cf shows {ratio:.1f}x larger mean drop ({stats['full']['mean']:.3f} vs {stats['no_cf']['mean']:.3f}) and higher drop rate ({stats['full']['drop_rate']:.3f} vs {stats['no_cf']['drop_rate']:.3f})."
         rect(42, 450, 896, 42, (243, 247, 255), 8, (219, 234, 254))
         text(490, 477, takeaway, 15, (30, 58, 138), True, "mm")
 
@@ -276,7 +280,7 @@ def print_table(stats):
     for model in ordered_models(stats):
         s = stats[model]
         print(
-            f"{model},{s['n']},{s['mean']:.6f},{s['p10']:.6f},{s['p25']:.6f},"
+            f"{display_model(model)},{s['n']},{s['mean']:.6f},{s['p10']:.6f},{s['p25']:.6f},"
             f"{s['median']:.6f},{s['p75']:.6f},{s['p90']:.6f},"
             f"{s['drop_rate']:.6f},{s['flip_rate']:.6f}"
         )

@@ -1,0 +1,1011 @@
+--- Page 1 ---
+Article
+Towards Detecting Chinese Harmful Memes with Fine-Grained
+Explanatory Augmentation
+Xinhao Chen, Dongxin Wen and Decheng Zuo *
+Faculty of Computing, Harbin Institute of Technology, Harbin 150001, China; chenxinhao@ftcl.hit.edu.cn (X.C.);
+wdongxin@hit.edu.cn (D.W.)
+* Correspondence: zuodc@hit.edu.cn
+Abstract
+The rapid proliferation of social media and generative large language models has increased
+multimodal harmful content, making harmful meme detection and explanation generation
+crucial for content moderation. In Chinese social media, meme harmfulness relies on
+implicit visual–textual interactions in cultural contexts, but existing research lacks a com-
+prehensive understanding of such cultural specificity. This neglect of the social background
+knowledge and metaphorical expressions inherent in memes results in limited detection
+performance. To address this challenge, we propose a novel fine-grained explanation-
+enhanced Chinese harmful meme detection framework (FG-E2HMD), a framework using
+Multimodal Large Language Models (MLLMs) with a culturally aware explanation genera-
+tion module to produce structured explanations, which integrate with multimodal features
+for decision-making. Comprehensive quantitative experiments and qualitative analyses
+were conducted on ToxiCN MM, the first large-scale dataset dedicated to Chinese harmful
+meme detection. The experimental results reveal that existing methods still have significant
+limitations in detecting Chinese harmful memes. Concurrently, our framework improves
+detection accuracy and decision transparency by incorporating explicit Chinese cultural
+background knowledge, paving the way for more intelligent, culturally adaptive content
+moderation systems.
+Keywords: Chinese harmful meme detection; Multimodal Large Language Model; content
+moderation system; explainable artificial intelligence
+Academic Editor: Chiman Kwan
+Received: 25 July 2025
+Revised: 27 August 2025
+Accepted: 1 September 2025 1. Introduction
+Published: 1 September 2025
+In the era of digital information, memes have emerged as a pivotal component of
+Citation: Chen, X.; Wen, D.; Zuo, D.
+internet culture, serving as a multimodal information carrier that integrates images and text.
+Towards Detecting Chinese Harmful
+Owing to their humorous and highly communicative characteristics, memes significantly
+Memes with Fine-Grained Explanatory
+Augmentation. Electronics 2025, 14, shape public communication and influence the public opinion ecosystem. Nevertheless, the
+3504. https://doi.org/10.3390/ ubiquity of memes and their substantial impact render them a double-edged sword. Beyond
+electronics14173504 fulfilling benign entertainment and social functions, memes are increasingly employed as
+Copyright: © 2025 by the authors. covert instruments for disseminating hate speech, promoting extremist ideologies, spread-
+Licensee MDPI, Basel, Switzerland. ing misinformation, and engaging in personal attacks [1,2]. The vast quantity of memes
+This article is an open access article on the internet and social media platforms presents a significant economic burden when
+distributed under the terms and
+manually reviewed. Consequently, there is an urgent need to develop multimodal content
+conditions of the Creative Commons
+understanding technology for the automatic identification of harmful memes. However, the
+Attribution (CC BY) license
+implicit and satirical nature of these harmful memes poses a serious challenge to automatic
+(https://creativecommons.org/
+licenses/by/4.0/).
+Electronics 2025, 14, 3504 https://doi.org/10.3390/electronics14173504
+
+--- Page 2 ---
+Electronics 2025, 14, 3504 2 of 20
+content moderation systems. In 2020, Facebook hosted the Multimodal Hate Meme Detec-
+tion competition, marking a significant milestone in research on toxic meme detection [2].
+Numerous datasets have been proposed by researchers, and corresponding recognition
+methods have been developed, yielding favorable recognition results [3–6]. However, these
+studies have primarily centered on English memes. Despite some advancements in this
+area, the body of research concerning Chinese harmful memes remains notably limited.
+On the one hand, the harmfulness of Chinese harmful memes is often not reflected
+in literal meanings or individual image elements but is deeply rooted in complex cultural
+contexts. Harmful memes are typically characterized as multimodal units, combining
+image and text, that inflict harm on individuals, organizations, communities, or social
+groups by targeting specific social entities. Moreover, memes on Chinese platforms often
+encompass general offenses, sexual innuendos, or promote a disheartening culture. Even
+though these memes sometimes lack specific targets, they still possess potential toxicity.
+Subtly promoting negative values, they can contribute to severe consequences such as
+violent acts and sexual harassment [7]. The creators or spreaders of these memes might
+employ homophonic jokes, historical references, social events, and internet subcultures as a
+means to obscure their true intentions. Such intentions necessitate a nuanced understanding
+of culture to be unearthed [7–9]. For instance, the act of juxtaposing a commonplace image
+with an ostensibly unrelated ancient poem or internet catchphrase to indirectly criticize a
+specific group or individual would likely go unnoticed by an automatic moderation system
+devoid of the requisite cultural knowledge [10–13].
+On the other hand, even the most powerful large multimodal models, including
+Qwen2.5-VL and GPT4o, possess significant general world knowledge. However, without
+targeted guidance and fine-tuning, these models frequently miss the intricate nuances
+of specific cultural contexts, particularly within the Chinese internet. As noted by Yang
+et al. [7], a deep understanding of Chinese multimodal content requires culturally embed-
+ded visual literacy, a crucial element that these general models often lack.
+The existing research on the detection and interpretive generation of harmful memes
+primarily focuses on the targets of the memes and the corresponding harmful content,
+overlooking the understanding of the metaphorical expressions of harmful memes and the
+related cultural background knowledge. Consequently, this creates a significant barrier
+for individuals lacking the requisite background knowledge to comprehend their implicit
+meaning [14–17]. Scott et al. [8] demonstrate that metaphor is one of the main expressions
+of harmful memes. Currently, the vast majority of content moderation systems operate
+like a black box, only outputting a label of “harmful” or “harmless” without providing
+explanations for their decisions. This opacity not only undermines the trustworthiness
+of moderation outcomes but also prevents platform administrators and users from com-
+prehending the essence of harmful content, undoubtedly hindering the construction of
+a healthy online community ecosystem [18–20]. Recent research has begun to address
+this issue, such as Lin et al. [9] proposing to generate explanations through debates from
+both harmful and harmless perspectives using a large multimodal model. However, it
+has not yet systematically integrated culturally specific knowledge into the explanation
+process. Therefore, the identification of metaphorical expressions in harmful memes, along
+with the associated cultural and social background knowledge, is essential for generating
+comprehensive, accurate, and easily understandable explanations [21–24]. As illustrated in
+Figure 1a, from the text within the image, including the phrases “generation gap”, “Palace
+Jade Liquid Wine”, “180 yuan per cup”, and “post-00s”—along with the three wolves in
+the image displaying divergent facial expressions—it is impossible to deduce the cause of
+the generation gap. The understanding of the meme’s profound meaning becomes clear
+only when one integrates the cultural context that the phrase “ Palace Jade Liquid Wine,
+
+--- Page 3 ---
+Electronics 2025, 14, 3504 3 of 20
+180 yuan per cup” originates from the sketch “Strange Encounters at Work” performed at
+the 1996 CCTV Spring Festival Gala. The image features two wolves on either side with
+open mouths, suggesting joyful communication, whereas the central wolf, labeled “post-
+00s”, exhibits a confused demeanor [25–27]. Given that individuals born post-2000 most
+likely have not watched “Strange Encounters at Work”, this meme humorously underscores
+the linguistic and cultural disparities between generations. As illustrated in Figure 1b, a pig
+is playing with a cabbage, and the text shows “I’ve settled you down”. Without considering
+the Chinese cultural background knowledge, this meme might be judged as harmless.
+However, when viewed within the context of Chinese cultural background knowledge, it
+becomes apparent that this is a meme with gender discrimination against men. Because
+this image expresses a Chinese proverb “All cabbage had been twiddled by pig”, which is
+a satire on some male–female relationships where the male’s overall quality is perceived
+to be inferior to the female’s. As shown in Figure 1c, the image shows five green puppy
+plush toys, and the text shows “which vegetable dog are you”, which would be judged as
+harmless without Chinese cultural background knowledge considered, while with Chinese
+cultural background considered, “vegetable dog” is a Chinese ironic phrase to mock some
+people who are incompetent. Thus, recognizing the metaphorical techniques in memes and
+incorporating pertinent cultural knowledge is imperative for assessing the potential harm
+of Chinese memes.
+In order to address the aforementioned challenges, we focus on Chinese harmful
+meme detection, aiming to build an automatic moderation system that is both accurate and
+interpretable. Our main contributions are as follows:
+1. We propose a novel explanation-enhanced detection framework, which is designed
+around a two-stage “first explanation, then judgment” mechanism. Initially, the
+framework is directed to generate a structured reasoning process that is both human-
+readable and of high quality (i.e., an explanation). Subsequently, this explanation is
+leveraged to enhance the final classification decision. This methodology significantly
+bolsters the robustness and accuracy of meme detection.
+2. In this study, we take the lead in systematically integrating Chinese cultural back-
+ground knowledge into our harmful meme detection model. This integration is both
+explicit and structural, ensuring a comprehensive understanding and generation of
+Chinese cultural background knowledge within the model. We employ a meticu-
+lously crafted “culture-aware prompt” to effectively activate and guide the MLLM to
+utilize the extensive knowledge acquired during its pre-training phase. This approach
+enables the MLLM to decode the profound cultural connotations embedded within
+memes.
+3. We conducted extensive experiments on ToxiCN MM [10], the largest dataset of
+Chinese harmful memes with fine-grained annotations and compared the performance
+with various advanced methods. The experimental results fully demonstrated the
+effectiveness of our proposed method.
+Overall, this work presents an MLLM-based fine-grained explanation-enhanced frame-
+work for Chinese harmful meme detection. Different from previous work, our proposed
+method prompts the model to output a structured description of “cultural background-
+metaphor-harm-target of attack” based on Chinese context through carefully designed
+prompt templates. By leveraging the powerful image understanding and text generation
+capabilities of Multimodal Large Language Models, the generated descriptions serve as
+strong auxiliary information, combined with multimodal image–text alignment features
+to enhance the overall performance of the model. The proposed method is rigorously
+evaluated on the ToxiCN MM test, set against various state-of-the-art models to verify its
+effectiveness. The remainder of this paper is structured as follows. Section 2 reviews the
+
+--- Page 4 ---
+Electronics 2025, 14, 3504 4 of 20
+related works. Section 3 outlines our proposed method, including three key components
+and culture-aware prompt templates. Section 4 presents and analyzes the experimental
+results. Section 5 discusses several cases and corresponding limitations and considerations.
+Finally, Section 6 concludes this work and highlights future directions.
+(a)
+(b) (c)
+Figure 1. Example of meme interpretation generation, incorporating explanations with Chinese
+cultural background knowledge. (a) The “Imperial Jade Liquor wine, priced at 180 yuan per cup”,
+comes from the 1996 CCTV Spring Festival Gala sketch “An Odd Job Encounter”. Meanwhile, the
+image shows two wolves on the left and right opening their mouths as if happily communicating,
+while the wolf marked with “post-00” in the middle displays a puzzled expression. People born after
+the year 2000 probably have not seen the sketch “An Odd Job Encounter”, so this meme humorously
+reflects generational differences in language and cultural barriers between age groups. (b) This
+image expresses a Chinese proverb “All cabbage had been twiddled by pig”, which is satire on some
+male–female relationships where the male’s overall quality is perceived to be inferior to the female’s.
+This image conveys gender bias. (c) This image conveys general offense and does not target any
+specific person of groups. “Vegetable dog” is a Chinese slut, implying incompetent people.
+2. Related Works
+2.1. Multimodal Harmful Meme Detection
+Harmful meme detection, as an important branch of multimodal content safety, has
+garnered significant attention in recent years [28–30]. Initial research efforts concentrated
+on the development of sophisticated fusion modules to integrate image and text features.
+With the success of the Transformer architecture [12], subsequent studies have employed
+Visual Transformer (ViT) [13] for visual understanding and BERT [11] for text understand-
+ing. These studies then leveraged the cross-attention mechanism to capture cross-modal
+correlations. For instance, the HMGUARD [1] framework enhances detection capabilities
+by analyzing propaganda techniques and visual arts. Ji et al. [14] argue that mapping
+the extracted text and image features to a unified feature space may introduce significant
+semantic discrepancies, potentially compromising the final performance of the model.
+
+--- Page 5 ---
+Electronics 2025, 14, 3504 5 of 20
+Therefore, they propose to first generate descriptive text and key-attribute information of
+image data, thus converting multimodal data into unimodal pure text data. Following
+this conversion, a prompt-based pre-trained language model processes the textual data,
+facilitating the detection of multimodal harmful memes [31–34]. However, the majority of
+these works have been trained and validated on English datasets, and their applicability to
+Chinese and other linguistic and cultural contexts still requires verification. The ToxiCN
+MM dataset is the first fine-grained annotated Chinese harmful meme dataset, which
+primarily encompasses the following dimensions: harmfulness assessment, a binary
+classification to determine whether the meme is harmful; identification of harmful types,
+a multi-classification involving targeted harmful, sexual innuendo, general offense, and
+dispirited culture; and modality combination feature analysis, which examines whether
+the harmful content is conveyed through text alone, images alone, or a combination of
+both. This framework employs a straightforward yet effective visual prompt tuning
+paradigm to optimize the mutual information between images and texts. It achieves this
+by incorporating a cross-modal contrastive alignment objective. Although ToxiCN MM
+and CHMEMES are both Chinese harmful meme datasets, they have not explored the
+research of generating explanations related to harmfulness combined with the Chinese
+cultural background knowledge.
+2.2. Explainable Multimodal Learning
+Memes frequently employ a plethora of rhetorical devices, such as metaphors, which
+often elude the current image caption generation methods designed for precise depiction
+of image scenes, due to their inability to interpret the inherent deep meanings [35–37]. As
+research on multimodal memes progressively deepens, researchers have further proposed
+the field of meme interpretation generation. Hee et al. [16] have developed HatReD, a
+human-curated dataset for generating explanations of multimodal hateful memes, in an
+endeavor to augment comprehension of the implications embedded within such memes.
+Their research has revealed a pronounced disparity between the performance of current
+State-of-The-Art (SOTA) multimodal pre-trained models and that of human experts when
+encountering memes from novel domains. This study constitutes a fundamental basis
+for future investigations into the field of harmful meme explanation generation. Hwang
+et al. [17] constructed a dataset called MemeCap. Each meme in this dataset was annotated
+with text information, image description, metaphorical expression, and human-generated
+meme interpretation. Lin et al. [9] simulated a multimodal debate between pro and con
+perspectives, enabling their model to generate arguments from both harmful and non-
+harmful viewpoints, and make a final judgment based on these arguments [38–41]. Our
+work takes a step forward on the basis of this idea, not only pursuing the generation of
+explanations but also emphasizing the cultural depth and structured nature of the content
+and using it as a key information source to improve decision-making accuracy.
+2.3. Chinese Content Security and Cultural Particularity
+Chinese information processing is challenging due to its unique linguistic and cultural
+characteristics. For advancing research in this area, a high-quality dataset is essential.
+The ToxiCN MM dataset represents a groundbreaking effort. As the first large-scale, fine-
+grained annotated Chinese harmful meme dataset, it provides a valuable cornerstone for
+researching multimodal harmful meme detection in the Chinese domain. Yang et al. [7]
+explicitly proposed the concept of culture-embedded visual literacy in their work and
+systematically explored various challenges in Chinese multimodal content detection, which
+emphasized the necessity of incorporating cultural knowledge. Zhu et al. [18] proposed
+the MiniGPT-4 model, which consists of a frozen ViT and Q-Former vision encoder, a linear
+
+--- Page 6 ---
+Electronics 2025, 14, 3504 6 of 20
+projection layer, and frozen Vicuna. The MiniGPT-4 only needs to train a linear projection
+layer to align the visual features and Vicuna. Zhang et al. [19] proposed a multimodal
+model named LLaMA-Adapter, which adaptively injects image features into LLaMA
+based on a gated zero-initialized attention mechanism while preserving the knowledge
+obtained from its pre-training stage, achieving good results in downstream tasks. Gao
+et al. [20] introduced LLaMA-Adapter V2, an enhanced version of LLaMA-Adapter. This
+model is fine-tuned using highly parameter-efficient visual instructions to achieve superior
+recognition performance in downstream tasks. Remarkably, it accomplishes this with fewer
+fine-tuning parameters compared with its predecessor, demonstrating improved efficiency
+and effectiveness. Subsequently, Liu et al. [21] introduced the LLaVA model, which employs
+GPT-4 to generate instruction fine-tuning training data. During the training phase, visual
+tokens are incorporated for instruction fine-tuning, utilizing GPT-4’s responses to align
+with the user’s intent. Ye et al. [22] unveiled a comprehensive multimodal model, mPLUG-
+Owl, exhibiting superior visual-language comprehension capabilities. Notably, it can
+interpret visual element-centric jokes. In our study, the proposed FG-E2HMD significantly
+enhances the efficacy of large multimodal models in detecting Chinese harmful memes.
+By integrating a culturally aware prompt, we further activate the extensive knowledge
+of MLLM acquired during pre-training, enabling a more accurate decoding of meme
+metaphors and profound cultural nuances.
+3. Materials and Methods
+The core idea of our method is to imitate the cognitive process of human experts
+in reviewing harmful content. When an expert is faced with a suspicious meme, they
+do not immediately make an intuitive judgment but go through an analytical process
+of decomposition, reasoning, and integration: first, observe the images and text; then,
+mobilize their background knowledge (including culture, history, and current events, etc.)
+for analysis, thereby forming a complete chain-of-explanation; and finally, based on this
+logically rigorous chain-of-explanation, give a final professional judgment. Our framework
+is designed to mimic this intricate procedure, encapsulated by the core principle: “Explain
+first, then predict”. Instead of directly producing the final output from the raw input, we
+introduce an explicit, structured explanation generation step as an intermediate bridge.
+This explanation facilitates human comprehension and operates as a refined and amplified
+signal, steering the model towards more dependable decisions. To this end, we design an
+overall model architecture as shown in Figure 2, comprising three pivotal modules: (1) a
+multimodal feature alignment module, (2) a culture-aware explanation generation module,
+and (3) an explanation-enhanced decision-making module.
+Figure 2. Overview of the FG-E2HMD framework for Chinese harmful meme detection.
+
+--- Page 7 ---
+Electronics 2025, 14, 3504 7 of 20
+3.1. Multimodal Feature Alignment
+This module is designed to extract both intermodal and intramodal information
+from the meme, converting raw multimodal data into deep semantic features. Drawing
+inspiration from Hee et al. [6], we employ a leading pre-trained model to secure high-
+quality representations. Given that our focus is on detecting Chinese harmful memes, we
+utilize the Qwen2.5-VL as our vision–language encoder. Specifically, we feed the meme
+image, denoted as I, and its text T into the frozen pre-trained multimodal large model to
+generate a unified multimodal representation F :
+mm
+F = Encoder ([I, T])
+mm MLLM
+F will serve as the input basis for all subsequent modules.
+mm
+3.2. Culture-Aware Explanation Generation
+This is the core component of our proposed framework, designed to accept the mul-
+timodal representation F and a piece of culture-aware prompt template, subsequently
+mm
+generating a high-quality, structured, and culturally enriched explanatory text T . We
+exp
+achieve this by fine-tuning a powerful large multimodal model (Qwen2.5-VL in our method)
+with instructions. Inspired by [10], we meticulously crafted a series of refined instruction
+templates that employed a chain-of-thought-like approach, directing the MLLMs to execute
+systematic, step-by-step reasoning and generate outputs adhering to a predefined struc-
+ture [23]. This not only enhances the structure of the output but also guarantees that crucial
+aspects of the explanations are not overlooked. The template example is shown in Table 1.
+Table 1. Example of an instruction template.
+Prompt Template:
+You are a multimodal content security expert with a deep understanding of
+Chinese culture and the online ecosystem. Please analyze the given meme and provide a
+structured analysis based on the following four aspects:
+Cultural Background Analysis: Does this image or text involve specific cultural
+elements of China (such as historical events, characters, internet memes, proverbs, social
+phenomena, etc.)? Please specify its origin and meaning.
+Metaphor and Subtext: How are the image and text content combined, and what
+are they implying, suggesting, or insinuating? What is the underlying subtext
+or metaphor?
+Harm Assessment: Based on the above analysis, please determine whether the
+meme is harmful or harmless.
+Target of Attack: If the meme is harmful, please indicate which specific individual,
+group, or organization is being targeted, attacked, satirized, or smeared.
+Summarize the above generated content into 5 sentences, with no more than
+50 words in each sentence.
+By fine-tuning the model through structured and well-designed instructional prompts,
+the model learns to systematically decompose and analyze a meme. This approach provides
+a more detailed understanding than a general impression, which is particularly beneficial
+for decision-makers seeking a concrete basis for judgment.
+3.3. Explanation-Enhanced Decisions
+With the structured explanation text T obtained, this module is responsible for
+exp
+utilizing it to assist and enhance the final classification decision. As shown in the overall
+architecture of the model in Figure 2, the generated explanatory text T is first input into
+exp
+the text encoder RoBERTa to obtain its deep semantic representation F . F is the essence
+exp exp
+
+--- Page 8 ---
+Electronics 2025, 14, 3504 8 of 20
+of the model’s inference and refinement of the original information, focusing on the key
+harmful information underlying the meme. We integrate the original multimodal features
+F with the generated explanatory features F using a simple vector concatenation to
+mm exp
+obtain the final decision-making features F = (cid:2) F ; F (cid:3) , in which F ∈ R h ×2
+f inal mm exp f inal
+and h represents the dimension of the hidden layer of the model. Finally, the fused F is
+f inal
+fed into a simple trainable classifier, which first performs a linear transformation on F ,
+f inal
+and then generates detection probability through the softmax function to judge whether
+the meme is harmful. Since F contains both original information and explanatory
+f inal
+information after logical reasoning, the decision-making process is thus more robust,
+transparent, and accurate.
+4. Experimental Results and Analysis
+4.1. Datasets and Baselines
+All the experiments of this work are conducted on ToxiCN MM, which is the first
+large-scale dataset for Chinese harmful meme detection, containing 12,000 samples with
+fine-grained annotations of meme types. We follow its official data split, which divides the
+dataset into training set (80%), validation set (10%), and test set (10%), and mainly conduct
+a binary classification task of harmful or non-harmful. In addition to the FG-E2HMD
+proposed in this paper, we have evaluated the performance of various baseline models.
+These baseline models include both unimodal and multimodal types. For unimodal model
+baselines, we select DeepSeek-V3, RoBERTa, and GPT4 as pure text modality baselines to
+directly classify the text of the memes and Image-Region, ResNet, and ViT as pure image
+modality baselines to directly classify the extracted image features of the memes. For
+multimodal model baselines, we choose GPT4, CLIP+MKE, Visual BERT COCO, Hate-
+CLIPper, MOMENTA, PromptHate, zero-shot Qwen2.5-VL (here Qwen2.5-VL is not fine-
+tuned but is directly asked the question “Is this meme toxic?” and judged based on its
+response), and the SOTA model related to explanation generation, debate-based model [9],
+then fine-tune it on ToxiCN MM. These are the main comparison objects of our method.
+Furthermore, for the baseline models we compared, if there is the same baseline as that in
+ToxiCN MM, the results in ToxiCN MM are directly adopted.
+4.2. Evaluation Metrics
+We employ precision, recall, macro F1-score, and the F1 score of toxic memes as our
+evaluation metrics. Since our work mainly targets the detection of Chinese harmful memes,
+the MLLM in the overall framework is the frozen Qwen2.5-VL, which primarily functions
+as the encoder in the visual-language alignment module and the explanation generator in
+the culture-aware explanation generation module. For the encoder within the explanation-
+enhanced decision module, we opt for RoBERTa, given its superior encoding capabilities
+for Chinese texts. Notably, the specific version we use is chinese-roberta-wwm-ext-base.
+4.3. Parameter Setting
+The experimental parameters are set as follows: the batch size is 32, the learning rate
+is 1 × 10−5, and the number of training epochs is 10. We use AdamW as our optimization
+strategy, with the decay rate β and β set to 0.9 and 0.95, respectively. The weight decay is
+1 2
+set to 0.02 to perform regularization control on the model parameters. The Qwen2.5-VL
+used is the 7B version. All experiments were conducted on two NVIDIA RTX A6000 GPUs.
+For details, see Appendix A.1 and Table A2.
+
+--- Page 9 ---
+Electronics 2025, 14, 3504 9 of 20
+4.4. Quantitative Analysis
+We evaluated our proposed FG-E2HMD and all baseline models on the ToxiCN MM
+test set, and the detailed results are shown in Table 2. As can be seen from the experimen-
+tal results, multimodal models generally outperform unimodal models, confirming the
+efficacy of integrating image and text features for identifying harmful memes. Although
+the zero-shot performance of the general multimodal large model Qwen2.5-VL is com-
+mendable, it falls short of models that have been specifically fine-tuned, underscoring
+the importance of domain adaptation. Notably, the two interpretation-based methods,
+the debate-based model and our proposed FG-E2HMD, markedly outperformed other
+baselines except for CLIP+MKE. This suggests that generating detailed explanations of rich
+cultural backgrounds enhances model performance in detecting Chinese harmful memes.
+Most importantly, our proposed FG-E2HMD has reached the SOTA performance in all met-
+rics, with an F1 score of 83.39, which has increased by 3.94% compared with the previous
+best CLIP+MKE model. In addition, the performance of our proposed FG-E2HMD is also
+significantly superior to another interpretation-based method, the debate-based model.
+This fully demonstrates the superiority of our culture-aware and explanation-enhancement
+mechanisms over general explanation generation techniques.
+Table 2. Performance comparison of different models on the ToxiCN MM test set. The best and
+second-best results of each metric are highlighted in bold and underlined, respectively.
+Model P R F1 F1
+harm
+DeepSeek-V3 74.63 75.36 74.99 58.75
+Text-only RoBERTa 75.52 77.54 76.36 66.48
+GPT4 74.52 65.59 68.01 51.78
+Image-Region 65.96 66.06 66.01 52.95
+Image-only ResNet 66.61 66.92 66.76 53.76
+ViT 68.97 68.61 68.78 57.24
+GPT4 74.67 68.64 70.11 55.77
+CLIP+MKE 79.76 80.79 80.23 72.35
+VisualBERT COCO 72.21 69.36 70.76 57.21
+Hate-CLIPper 73.56 68.52 70.95 60.36
+Multimodal
+MOMENTA 74.05 69.88 71.90 62.45
+PromptHate 75.83 72.36 74.05 63.15
+Qwen2.5-VL(zero-shot) 70.25 73.36 71.77 58.76
+Debate-based model 79.93 81.16 79.91 70.53
+FG-E2HMD 83.53 83.26 83.39 74.43
+4.5. Ablation Study
+To verify the effectiveness and necessity of each innovative module in FG-E2HMD, we
+have conducted a series of ablation experiments, the results of which are shown in Table 3.
+The results of ablation experiments indicate that
+• “Structured output” provides stable gains. Removing the requirement for structured
+output, there is a slight decline in model performance (2.54%/1.81%). This indicates
+that forcing the model to think and express according to the logical chain of “cultural
+background-metaphor-harmfulness-target of attack” helps form a more organized and
+focused reasoning process, thereby bringing about stable performance improvements.
+
+--- Page 10 ---
+Electronics 2025, 14, 3504 10 of 20
+• “Cultural awareness” is the core. After removing the specially designed culture-aware
+prompt and switching to a generic prompt, there was a significant drop in model
+performance (3.39%/2.78%). This indicates that explicitly incorporating the cultural
+background information that a meme might imply into the model’s thinking and
+analysis process greatly benefits the performance of the model in the task of detecting
+harmful memes.
+• “Explanation-enhanced decision-making” is of paramount importance. Removing the
+explanation-enhanced decision-making module results in the largest performance drop
+(9.65%/9.23%). This indicates that simply generating an explanation is insufficient. Most
+importantly, there is a need to effectively reintegrate high-quality explanation features
+into the decision-making process in order to optimize the model’s final performance.
+• Structured representation and the culture-aware prompt have complementary gains.
+Removing the culture-aware prompt alone results in a 3.39 decrease in F1; when si-
+multaneously removing the structured representation (line 6), the F1 further decreases
+by 10.3, a decrease significantly greater than the sum of the two individual decreases
+(3.39 + 2.54 = 5.93). This “superposition” decrease indicates that the structured output
+provides more controllable semantic slots for cultural prompts, while cultural prompts
+in turn enhance the adaptability of structured representation to the Chinese language
+context, forming a positive coupling between the two.
+• Complete framework achieves robust detection through “Divide and Conquer”. When
+all the three modules are removed (last row), the model degrades into a normal black-
+box classifier, and F1 drops to 72.33, 13.18% points lesser than the complete framework.
+This verifies the design hypothesis of FG-E2HMD:
+• Structured representation is responsible for the controllable output at the “form” level.
+• The culture-aware prompt is responsible for the alignment of cultural context at the
+“content” level.
+• Explanation enhancement is responsible for the “logic” layer of verifiable reasoning.
+• After superimposing the three models, the model achieves the current optimal 83.39 F1
+in the task of Chinese harmful meme detection and has significant fault tolerance to
+the local failure of individual modules.
+Table 3. Evaluation results of the ablation experiments. The bold indicates optimal results, and
+the numbers before and after the “/” in the performance drop column correspond to the degree of
+decline in F1 and F1 , respectively.
+harm
+Method F1 F1 Performance Drop Interpretation
+harm
+A complete framework
+Full FG-E2HMD 83.39 74.43 —
+containing all modules.
+Do not force structured output
+W/O structured representation 81.27 73.08 2.54%/1.81% and generate free-form text
+explanations.
+Use the general prompt (directly
+W/O culture-aware prompt 80.56 72.36 3.39%/2.78% prompt the model to “explain
+why it is harmful”).
+Remove the
+“explanation-enhancement
+W/O explanation enhancement 75.34 67.56 9.65%/9.23%
+decision-making module” and
+classify directly using F .
+mm
+Jointly remove the culture-aware
+W/O culture-aware prompt and
+77.65 68.93 6.88%/7.39% prompt and explanation
+explanation enhancement
+enhancement.
+
+--- Page 11 ---
+Electronics 2025, 14, 3504 11 of 20
+Table 3. Cont.
+Method F1 F1 Performance Drop Interpretation
+harm
+Jointly remove the culture-aware
+W/O structured representation
+74.82 67.02 10.3%/9.9% prompt and structured
+and culture-aware prompt
+representation.
+Jointly remove explanation
+W/O explanation enhancement
+76.03 68.11 8.83%/8.50% enhancement and structured
+and structured representation
+reprensentation.
+W/O all three modules 72.33 64.81 13.18%/12.92% Remove all three modules.
+5. Discussion
+To further illustrate the basic principle of FG-E2HMD, as shown in Table 4, we provide
+three cases for study. From the textual caption and the image caption information of case (a),
+it can be seen that both our work and the compared baselines have captured the keyword
+“ugly thing” and simultaneously captured the exaggerated expression and emotionally
+excited demeanor of the man in the picture; thus, both have correctly classified case (a).
+However, the explanation generated by our model interprets “skr” as mockery and sarcasm.
+But from the perspective of Chinese internet culture, the popularity of “skr” originates from
+a Chinese rap show, which means to praise the contestant, generally referring to being very
+good. This may be due to the hallucination of the underlying MLLM. The original meaning
+of “skr” in case (a) should be a homophonic pun in Chinese internet culture, pronounced
+similar to “shi ge”, which means “is a”; thus, incorporating the text into the meme, it forms
+a complete sentence “You are an ugly thing”. This is the true understanding of the deep
+meaning of this meme.
+Table 4. Explanation of the case study. The green and red highlighted parts, respectively, represent
+the correct and incorrect information related to meme hazard detection. In the actual implementation
+process, all descriptions are in Chinese.  indicates the model makes a correct prediction, while ×
+indicates the model makes a wrong prediction.
+Harmful Meme
+(a) You Skr Ugly Thing
+(b) Scientists are Working to
+(c) Girls Wash Clothes:
+Cure Them
+Underwear, Dark Clothes, Light
+Clothes. Boys Wash Clothes.
+Targeted Harmful, Targeted Harmful,
+Ground Truth General Offensive, Harmful Text
+Text–Image Fusion Text–Image Fusion
+This is a reminder about laundry
+The sentence translates to “You
+classification, suggesting that girls
+ugly thing”, with “skr” being an
+Scientists are working to cure and boys should wash their
+Text description internet slang term, overall
+diseases that affect women. clothes separately, and underwear,
+expressing insult and
+dark, and light clothes should
+dissatisfaction towards someone.
+also be washed separately.
+
+--- Page 12 ---
+Electronics 2025, 14, 3504 12 of 20
+Table 4. Cont.
+Harmful Meme
+(a) You Skr Ugly Thing
+(b) Scientists are Working to
+(c) Girls Wash Clothes:
+Cure Them
+Underwear, Dark Clothes, Light
+Clothes. Boys Wash Clothes.
+Two comic strips, one showing a
+An exaggeratedly expressive and
+woman tidying up clothes for
+emotionally agitated man, with Two girls in wedding dresses are
+Image description washing, the other showing a man
+his fingers pointing forward, kissing each other.
+casually throwing clothes into the
+seemed to be shouting.
+wash, with a cat sitting below.
+[Cultural Background Analysis]
+The image combines traditional
+wedding elements, and the text
+mentions “scientists are working
+[Cultural Background Analysis] hard to cure them,” which implies
+[Cultural Background Analysis]
+The picture text combines the a humorous interpretation of the
+The image utilizes gender
+“skr” meme in Chinese internet phenomenon of
+stereotypes in Chinese internet
+culture, carrying a mocking and same-sex weddings.
+culture, emphasizing the
+sarcastic meaning. [Metaphor and Subtext] The
+meticulousness of girls and the
+[Metaphor and Subtext] stereotype and bias towards
+roughness of boys.
+Expressions paired with text sexual minorities are
+[Metaphor and Subtext] The
+implied a disparaging attitude, metaphorically represented
+comparison of washing clothes is
+denigrating someone’s through the kissing scene and the
+a metaphor for the traditional
+appearance or behavior. words “scientists are working
+social perception of the
+[Harmfulness Determination] The hard to cure them”.
+Explanation from differences in behavior between
+meme is highly offensive and [Harmfulness Determination] The
+FG-E2HMD men and women.
+potentially harmful through its content is clearly insulting and
+[Harmfulness etermination]
+abusive language. offensive and belongs to
+The content is inoffensive and is
+[Target of Attack] Its main target harmful content.
+meant primarily to entertain the
+is individuals referred to as “ugly [Target of Attack] The main attack
+audience and evoke resonance.
+things”, the specifics of which target is the sexual minority
+[Target of Attack] No attacks or
+are unclear. group (LGBTQ + group), which
+insults were made against
+[Conclusion] Based on a strengthens discrimination
+specific groups.
+comprehensive assessment, this against them.
+[Conclusion] It is a harmless
+meme is considered harmful [Conclusion] This meme belongs
+product of online culture and is
+content and should be to harmful content. It utilizes
+suitable for easy sharing.
+disseminated with caution. stereotypes of sexual minorities,
+easily inciting insults and harm
+against the LGBTQ+ community,
+which is not conducive to creating
+an inclusive social environment.
+GPT4:  Qwen2.5-VL(zero-shot): GPT4: × Qwen2.5-VL(zero-shot): GPT4: × Qwen2.5-VL(zero-shot):
+Prediction  Debate-based Model:  × Debate-based Model: × × Debate-based Model: ×
+FG-E2HMD:  FG-E2HMD:  FG-E2HMD: ×
+5.1. Case Study
+To gain more insights on the challenging issues related to Chinese harmful meme de-
+tection, we manually examine most of the misclassified samples of the compared baselines
+and find that the errors are mainly of two types:
+• The model may occasionally misclassify a meme due to the benign information it
+contains.
+
+--- Page 13 ---
+Electronics 2025, 14, 3504 13 of 20
+• The model frequently demonstrates a deficiency in comprehending the intricate cul-
+tural context inherent in Chinese memes, leading to erroneous judgments.
+Error classification category I: As illustrated in case (b), when the model is provided
+with text or image information, both the compared baselines and our proposed model judge
+the input information as harmless. However, when the model is provided with both text
+and image information simultaneously, only our proposed model accurately determines
+that the meme is harmful. This is because our proposed model recognizes that the image
+combines wedding elements from traditional culture. In the image, two women are kissing,
+and our model integrates Chinese cultural background knowledge that same-sex marriage
+is not permitted and, combined with the text part “scientists are working hard to cure
+them”, metaphorically implies stereotypes or prejudice against the LGBTQ+ community.
+The underlying implication is that homosexuality is perceived as an abnormality that needs
+to be “cured”, which is ironic and can potentially provoke insults and harm to sexual
+minorities. This is precisely the benefit brought by the “structured output” which leads to
+a more organized and focused reasoning process, as well as the “cultural-aware prompt”
+which explicitly incorporates the cultural background information behind the meme into
+the process of assessing their harmfulness, further demonstrating the effectiveness of our
+proposed methods.
+Error classification category II: As illustrated in case (c), all models, including our
+proposed one and all compared baselines, have given incorrect classification results. The
+model represents the information within the image through two illustrative scenes: one
+depicting a woman washing clothes after sorting them, and the other portraying a man
+washing clothes without prior classification. All of these are positive information. The text
+in the picture describes “This is a reminder about sorting laundry. It is recommended that
+girls and boys wash their clothes separately. Underwear, dark, and light clothes should
+be washed separately”, which is also benign information. While our proposed model
+incorporates cultural background knowledge to examine the use of gender stereotypes
+in Chinese internet culture—notably the portrayal of girls as meticulous and boys as
+rough— it still assesses the meme as benign. The rationale provided is that the content is
+harmless, primarily designed to entertain and evoke resonance with the audience. This
+discrepancy might arise from the fact that both the compared baselines and our proposed
+model were subjected to a considerable number of prompts and amount of training
+data underscoring gender equality during pre-training, potentially leading to incorrect
+assessments. Nevertheless, when the meme is evaluated by human experts, it becomes
+evident that the meme targets the stereotype of gender discrimination. Consequently,
+it is imperative to investigate more effective post-training techniques and alignment
+methods with human values to balance the model’s performance and the challenge of
+over-emphasis on gender equality.
+The aforementioned case study further demonstrates that Chinese harmful meme
+detection remains a challenging multimodal semantic understanding task for existing LLMs
+and MLLMs. Beyond the comprehensive integration of visual and textual information,
+effectively and accurately incorporating Chinese cultural context knowledge continues to
+pose a critical challenge in this domain.
+5.2. Limitations and Ethical Considerations
+5.2.1. Dependence on Underlying MLLM Capabilities
+Our proposed framework is constrained by the MLLM acting as the “explanation
+generator”. If the base model itself lacks certain niche or lesser-known knowledge, it
+will be unable to generate high-quality explanations, and in severe cases, might produce
+hallucinations that are unrelated to the meme content, which could potentially exacerbate
+
+--- Page 14 ---
+Electronics 2025, 14, 3504 14 of 20
+biases or stereotypes against certain social groups. Therefore, more robust methods like
+retrieval-augmented generation (RAG) can be considered to ensure that the generated
+explanations are more relevant and of higher quality.
+5.2.2. Adaptation to New Memes
+The generation and dissemination of internet memes are proliferating at an unprece-
+dented pace, with novel slang terms, trending events, and expressive formats emerging
+continuously on a daily basis. This phenomenon may lead to a “knowledge lag” issue,
+wherein the model may fail to remain fully updated with newly emerged, previously
+unseen memes that were absent from its pre-training dataset. Furthermore, despite
+advancements in automated harmful meme detection, inherent biases may still persist
+within the model’s operational framework. Consequently, ongoing evaluation is imper-
+ative to ensure that our system maintains optimal performance and ethical integrity in
+real-world applications.
+5.2.3. Potential Misuse Risks
+A model capable of generating deep rationales can, in theory, also be potentially
+leveraged by malicious users to craft more convincing, harder-to-detect harmful content.
+However, the benefits brought by deep rationales far outweigh the possible risks. By
+providing deep rationales to content moderators, they can be helped to more effectively
+identify and flag potentially harmful content and thus foster a more harmonious, inclusive,
+and free internet environment.
+6. Conclusions
+This study systematically addresses the dual challenges of cultural comprehension
+disparities and interpretability deficiencies in Chinese harmful meme detection by propos-
+ing an innovative explanation-enhanced detection framework leveraging large multimodal
+models. Rather than treating the model as an end-to-end black box, we innovatively intro-
+duce a culture-aware explanation generation module that strategically guides the model to
+adopt an “explain-before-judging” paradigm. Through extensive experiments on the first
+large-scale Chinese harmful meme dataset ToxiCN MM, we empirically validate the efficacy
+of our proposed FG-E2HMD framework. The FG-E2HMD we proposed achieved the best
+results on the ToxiCN MM test set, with 83.39 F1 score and 74.43 F1 score, respectively.
+harm
+The results demonstrably establish that the explanation-enhanced decision-making ap-
+proach, particularly when augmented with cultural context integration, constitutes a robust
+solution for Chinese harmful meme detection. We attribute the method’s success to the
+explicit explanation generation mechanism, which compels the model to transition from
+superficial pattern recognition to sophisticated logical reasoning. This mechanism, similar
+to the chain-of-thought, enables the model to decompose complex problems and focus
+on the key semantics in the task, thereby avoiding intuitive misjudgments arising from
+reliance on superficial data features alone.
+Future Work
+In terms of future work, we will design more effective methods to address the task of
+Chinese harmful meme detection. This will be developed from the following aspects:
+• Automatic knowledge updating mechanism: we will investigate methods to dy-
+namically integrate external knowledge bases such as online encyclopedias, modern
+language dictionaries, and real-time news feeds into the model to further improve its
+ability to learn continuously and adapt to evolving meme trends.
+
+--- Page 15 ---
+Electronics 2025, 14, 3504 15 of 20
+• Cross-cultural multilingual meme detection: the proposed framework will be ex-
+tended to other languages and cultural contexts (e.g., Japanese, Korean) to explore
+the development of a flexible, configurable content moderation system capable of
+operating effectively in multicultural environments.
+• Zero-shot and few-shot learning: we will examine how the model can leverage
+its strong inference capabilities to achieve efficient, explanation-enhanced harmful
+content detection under data-scarce or zero-shot conditions, thereby broadening its
+applicability to emerging and low-resource risk scenarios.
+• Lightweight interpretation model solution: We will design a knowledge distillation
+framework to transfer the knowledge from large interpretive models to small models
+and meanwhile, introduce model pruning and quantization techniques. We aim to
+reduce the number of parameters and computational complexity and explore a simpli-
+fied version of the attention mechanism while retaining key explanatory capabilities
+and reducing computational overhead. In addition, we plan to design hierarchical
+explanation strategies and generate explanations in stages based on the harmfulness
+level of the memes.
+Author Contributions: Conceptualization, X.C. and D.W.; Methodology, X.C.; Software, X.C.; Val-
+idation, X.C.; Formal analysis, X.C. and D.Z.; Investigation, X.C.; Resources, X.C. and D.Z.; Data
+curation, X.C.; Writing—original draft preparation, X.C. and D.W.; Writing—review and editing, X.C.
+and D.Z.; Visualization, X.C.; Supervision, D.W. and D.Z.; Project administration, D.Z. All authors
+have read and agreed to the published version of the manuscript.
+Funding: This research was funded by the National Natural Science Foundation of China (No.
+61202091, 62171155).
+Institutional Review Board Statement: Not applicable.
+Informed Consent Statement: Not applicable.
+Data Availability Statement: The data presented in this study are available in the public domain:
+https://github.com/DUT-lujunyu/ToxiCN_MM/ (accessed on 25 July 2025).
+Acknowledgments: We would like to express our gratitude to the members and staff of the Fault
+Tolerance and Mobile Computing Research Center at Harbin Institute of Technology.
+Conflicts of Interest: The authors declare no conflicts of interest.
+Abbreviations
+The following abbreviations are used in this manuscript:
+MLLMs Multimodal Large Language Models
+LLMs Large Language Models
+RAG Retrieval-Augmented Generation
+SOTA State of The Art
+RoBERTa Robustly Optimized BERT Pre-training Approach
+ViT Vision Transformer
+BERT Bidirectional Encoder Representations from Transformers
+Appendix A
+Appendix A.1
+As shown in Table A1, to help readers better understand the methods proposed in this
+paper, we provide the detailed pseudocode.
+
+--- Page 16 ---
+Electronics 2025, 14, 3504 16 of 20
+Table A1. Pseudocode of FG-E2HMD.
+# ----------------------------------------------------------------------------------------------------------------
+# Pseudocode: Towards Detecting Chinese Harmful Memes with Fine-Grained
+Explanatory Augmentation
+# ----------------------------------------------------------------------------------------------------------------
+# 1. Global Constants and Pre-trained Models
+PRETRAINED_MLLM = load_model(“Qwen2.5-VL-7B”) # frozen weights
+TEXT_ENCODER = load_model(“RoBERTa”) # trainable weights
+CLASSIFIER = MLP(input_dim = 2 * hidden_dim,
+Output_dim = 2) # harmful/harmless
+CULTURE_AWARE_PROMPT=read_prompt_template(“culture_aware_template.txt”)
+# 2. Multimodal Feature Alignment Module
+def multimodal_feature_alignment(image I, text T):
+“””
+Input: original image I and text T
+Output: unified multimodal representation F extracted by frozen MLLM
+mm
+“””
+F = PRETRAINED_MLLM.encode([I, T]) # [hidden_dim]
+mm
+return = F # Shared by subsequent module
+mm
+# 3. Culture-Aware Explanation Generation Module
+def culture_aware_explanation_generation(F ):
+mm
+“””
+Input: multimodal representation F
+mm
+Output: Structured explanation text T
+exp
+“””
+prompt = fill_template(CULTURE_AWARE_PROMPT, F )
+mm
+T = PRETRAINED_MLLM.generate(prompt) # output after instruction
+exp
+# fine-tuning
+return T
+exp
+# 4. Explanation-enhanced Decision-making Module
+def explanation_enhanced_decision(F , T ):
+mm exp
+“””
+Input: original multimodal feature F , explanation text T
+mm exp
+Output: harmful probability distribution yˆ
+“””
+# 4.1 explanation text encoding
+F = TEXT_ENCODER.encode(T ) # [hidden_dim]
+exp exp
+# 4.2 feature fusion
+F = concatenate([F , F ]) # [2 * hidden_dim]
+final mm exp
+# 4.3 classification
+logits = CLASSIFIER(F ) # dim = 2
+final
+yˆ = softmax(logits) # probability vector
+return yˆ
+# 5. End-to-end Inference Process
+def main(image_path, text_content):
+I = load_image(image_path)
+T = text_content
+F = multimodal_feature_alignment(I, T)
+mm
+T = culture_aware_explanation_generation(F )
+exp mm
+
+--- Page 17 ---
+Electronics 2025, 14, 3504 17 of 20
+Table A1. Cont.
+yˆ = explanation_enhanced_decision(F , T )
+mm exp
+predicted_label = argmax(yˆ) # 0: harmless, 1: harmful
+return {
+“label”: predicted_label,
+“probability”: yˆ,
+“explanation”: T
+exp
+# 6. Training Loop(optional)
+def train_step(batch):
+for (I, T, y) in batch:
+F = multimodal_feature_alignment(I, T)
+mm
+T = culture_aware_explanation_generation(F )
+exp mm
+yˆ = explanation_enhanced_decision(F , T )
+mm exp
+loss = cross_entropy(yˆ, y)
+backpropagate(loss, parameters=[TEXT_ENCODER, CLASSIFIER])
+optimizer_step()
+Appendix A.2
+As shown in Table A2, it illustrates the main parameter settings in the experiment.
+Table A2. Hyperparameters for experiments.
+Parameter Category Setting
+Optimizer AdamW
+Batch Size 32
+Learning Rate 1 × 10−5
+Training Epochs 10
+β1 0.9
+β2 0.95
+Weight Decay 0.02
+Qwen2.5-VL-7B
+Model
+RoBERTa (chinese-roberta-wwm-ext-base)
+GPUs 2 × NVIDIA RTX A6000
+Appendix A.3
+As shown in Table A3, our proposed FG-E2HMD is tested directly on the newly
+collected dataset, obtaining an F1 score of 74.57. After only five epochs of fine-tuning, the
+model’s F1 score reached 80.80. These results demonstrate the generalization and scalability
+of FG-E2HMD.
+Table A3. Evaluation results of FG-E2HMD on our newly collected datasets.
+Model P R F1 F1
+harm
+FG-E2HMD 75.62 73.54 74.57 68.59
+FG-E2HMD after 5
+80.25 81.36 80.80 71.35
+epochs fine-tuned
+
+--- Page 18 ---
+Electronics 2025, 14, 3504 18 of 20
+Appendix A.4
+As shown in Figure A1, the scores of our proposed method FG-E2HMD are the highest
+under four metrics, indicating the effectiveness of our proposed method.
+Figure A1. Performance comparison of different models on the ToxiCN MM test set.
+References
+1. Zhuang, Y.; Guo, K.; Wang, J.; Jing, Y.; Xu, X.; Yi, W.; Yang, M.; Zhao, B.; Hu, H. I Know What You MEME! Understanding and
+Detecting Harmful Memes with Multimodal Large Language Models. In Proceedings of the 2025 Network and Distributed
+System Security Symposium, San Diego, CA, USA, 24–28 February 2025; Internet Society: San Diego, CA, USA, 2025.
+2. Kiela, D.; Firooz, H.; Mohan, A.; Goswami, V.; Singh, A.; Ringshia, P.; Testuggine, D. The Hateful Memes Challenge: Detecting
+Hate Speech in Multimodal Memes. arXiv 2021, arXiv:2005.04790. [CrossRef]
+3. Zhang, L.; Jin, L.; Sun, X.; Xu, G.; Zhang, Z.; Li, X.; Liu, N.; Liu, Q.; Yan, S. TOT: Topology-Aware Optimal Transport for
+Multimodal Hate Detection. arXiv 2023, arXiv:2303.09314. [CrossRef]
+4. Cao, R.; Hee, M.S.; Kuek, A.; Chong, W.-H.; Lee, R.K.-W.; Jiang, J. Pro-Cap: Leveraging a Frozen Vision-Language Model for
+Hateful Meme Detection. arXiv 2023, arXiv:2308.08088. [CrossRef]
+5. Gomez, R.; Gibert, J.; Gomez, L.; Karatzas, D. Exploring Hate Speech Detection in Multimodal Publications. arXiv 2019,
+arXiv:1910.03814. [CrossRef]
+6. Hee, M.S.; Lee, R.K.-W. Demystifying Hateful Content: Leveraging Large Multimodal Models for Hateful Meme Detection with
+Explainable Decisions. arXiv 2025, arXiv:2502.11073. [CrossRef]
+7. Yang, S.; Cui, S.; Hu, C.; Wang, H.; Zhang, T.; Huang, M.; Lu, J.; Qiu, H. Exploring Multimodal Challenges in Toxic Chinese
+Detection: Taxonomy, Benchmark, and Findings. arXiv 2025, arXiv:2505.24341. [CrossRef]
+8. Scott, K. Memes as Multimodal Metaphors: A Relevance Theory Analysis. Pragmat. Cogn. 2021, 28, 277–298. [CrossRef]
+9. Lin, H.; Luo, Z.; Gao, W.; Ma, J.; Wang, B.; Yang, R. Towards Explainable Harmful Meme Detection through Multimodal Debate
+between Large Language Models. arXiv 2024, arXiv:2401.13298. [CrossRef]
+10. Lu, J.; Xu, B.; Zhang, X.; Wang, H.; Zhu, H.; Zhang, D.; Yang, L.; Lin, H. Towards Comprehensive Detection of Chinese Harmful
+Memes 2024. arXiv 2024, arXiv:2410.02378. [CrossRef]
+11. Devlin, J.; Chang, M.-W.; Lee, K.; Toutanova, K. BERT: Pre-Training of Deep Bidirectional Transformers for Language Understand-
+ing. arXiv 2018, arXiv:1810.04805. [CrossRef]
+12. Vaswani, A.; Shazeer, N.; Parmar, N.; Uszkoreit, J.; Jones, L.; Gomez, A.N.; Kaiser, L.; Polosukhin, I. Attention Is All You Need.
+arXiv 2017, arXiv:1706.03762. [CrossRef]
+
+--- Page 19 ---
+Electronics 2025, 14, 3504 19 of 20
+13. Dosovitskiy, A.; Beyer, L.; Kolesnikov, A.; Weissenborn, D.; Zhai, X.; Unterthiner, T.; Dehghani, M.; Minderer, M.; Heigold, G.;
+Gelly, S.; et al. An Image Is Worth 16x16 Words: Transformers for Image Recognition at Scale. arXiv 2020, arXiv:2010.11929.
+[CrossRef]
+14. Ji, J.; Ren, W.; Naseem, U. Identifying Creative Harmful Memes via Prompt Based Approach. In Proceedings of the ACM Web
+Conference 2023, Austin, TX, USA, 30 April–4 May 2023; ACM: Austin, TX, USA; pp. 3868–3872.
+15. Gu, T.; Feng, M.; Feng, X.; Wang, X. SCARE: A Novel Framework to Enhance Chinese Harmful Memes Detection. IEEE Trans.
+Affect. Comput. 2025, 16, 933–945. [CrossRef]
+16. Hee, M.S.; Chong, W.-H.; Lee, R.K.-W. Decoding the Underlying Meaning of Multimodal Hateful Memes. arXiv 2023,
+arXiv:2305.17678. [CrossRef]
+17. Hwang, E.; Shwartz, V. MemeCap: A Dataset for Captioning and Interpreting Memes. In Proceedings of the 2023 Conference
+on Empirical Methods in Natural Language Processing, Singapore, 6–10 December 2023; Bouamor, H., Pino, J., Bali, K., Eds.;
+Association for Computational Linguistics: Singapore, 2023; pp. 1433–1445.
+18. Zhu, D.; Chen, J.; Shen, X.; Li, X.; Elhoseiny, M. MiniGPT-4: Enhancing Vision-Language Understanding with Advanced Large
+Language Models. arXiv 2023, arXiv:2304.10592. [CrossRef]
+19. Zhang, R.; Han, J.; Liu, C.; Gao, P.; Zhou, A.; Hu, X.; Yan, S.; Lu, P.; Li, H.; Qiao, Y. LLaMA-Adapter: Efficient Fine-Tuning of
+Language Models with Zero-Init Attention. arXiv 2023, arXiv:2303.16199. [CrossRef]
+20. Gao, P.; Han, J.; Zhang, R.; Lin, Z.; Geng, S.; Zhou, A.; Zhang, W.; Lu, P.; He, C.; Yue, X.; et al. LLaMA-Adapter V2: Parameter-
+Efficient Visual Instruction Model 2023. arXiv 2023, arXiv:2304.15010. [CrossRef]
+21. Liu, H.; Li, C.; Wu, Q.; Lee, Y.J. Visual Instruction Tuning. arXiv 2023, arXiv:2304.08485. [CrossRef]
+22. Ye, Q.; Xu, H.; Xu, G.; Ye, J.; Yan, M.; Zhou, Y.; Wang, J.; Hu, A.; Shi, P.; Shi, Y.; et al. mPLUG-Owl: Modularization Empowers
+Large Language Models with Multimodality. arXiv 2023, arXiv:2304.14178. [CrossRef]
+23. Wei, J.; Wang, X.; Schuurmans, D.; Bosma, M.; Ichter, B.; Xia, F.; Chi, E.; Le, Q.; Zhou, D. Chain-of-Thought Prompting Elicits
+Reasoning in Large Language Models. arXiv 2022, arXiv:2201.11903. [CrossRef]
+24. Pan, F.; Luu, A.T.; Wu, X. Detecting Harmful Memes with Decoupled Understanding and Guided CoT Reasoning. arXiv 2025,
+arXiv:2506.08477. [CrossRef]
+25. Meguellati, E.; Zeghina, A.; Sadiq, S.; Demartini, G. LLM-Based Semantic Augmentation for Harmful Content Detection. arXiv
+2025, arXiv:2504.15548. [CrossRef]
+26. Bui, M.D.; von der Wense, K.; Lauscher, A. Multi3Hate: Multimodal, Multilingual, and Multicultural Hate Speech Detection with
+Vision-Language Models. arXiv 2024, arXiv:2411.03888. [CrossRef]
+27. Ranjan, R.; Ayinala, L.; Vatsa, M.; Singh, R. Multimodal Zero-Shot Framework for Deepfake Hate Speech Detection in Low-
+Resource Languages. arXiv 2025, arXiv:2506.08372. [CrossRef]
+28. Rana, A.; Jha, S. Emotion Based Hate Speech Detection Using Multimodal Learning. arXiv 2025, arXiv:2202.06218. [CrossRef]
+29. Pramanick, S.; Dimitrov, D.; Mukherjee, R.; Sharma, S.; Akhtar, M.S.; Nakov, P.; Chakraborty, T. Detecting Harmful Memes and
+Their Targets. In Proceedings of the Findings of the Association for Computational Linguistics: ACL-IJCNLP 2021, Online Event,
+1–6 August 2021; Zong, C., Xia, F., Li, W., Navigli, R., Eds.; Association for Computational Linguistics: Stroudsburg, PA, USA,
+2021; pp. 2783–2796.
+30. Kumari, G.; Bandyopadhyay, D.; Ekbal, A.; NarayanaMurthy, V.B. CM-Off-Meme: Code-Mixed Hindi-English Offensive Meme
+Detection with Multi-Task Learning by Leveraging Contextual Knowledge. In Proceedings of the 2024 Joint International
+Conference on Computational Linguistics, Language Resources and Evaluation (LREC-COLING 2024), Torino, Italy, 20–25 May
+2024; Calzolari, N., Kan, M.-Y., Hoste, V., Lenci, A., Sakti, S., Xue, N., Eds.; ELRA and ICCL: Torino, Italia, 2024; pp. 3380–3393.
+31. Modi, T.; Shah, E.; Shah, S.; Kanakia, J.; Tiwari, M. Meme Classification and Offensive Content Detection Using Multimodal
+Approach. In Proceedings of the 2024 OITS International Conference on Information Technology (OCIT), Vijayawada, India,
+12 December 2024; pp. 635–640.
+32. Prasad, N.; Saha, S.; Bhattacharyya, P. Multimodal Hate Speech Detection from Videos and Texts. Available online: https:
+//easychair.org/publications/preprint/km3Rv/open (accessed on 25 July 2025).
+33. Lin, H.; Luo, Z.; Ma, J.; Chen, L. Beneath the Surface: Unveiling Harmful Memes with Multimodal Reasoning Distilled from
+Large Language Models. In Proceedings of the Findings of the Association for Computational Linguistics: EMNLP 2023,
+Singapore, 6–10 December 2023; Bouamor, H., Pino, J., Bali, K., Eds.; Association for Computational Linguistics: Singapore, 2023;
+pp. 9114–9128.
+34. Pandiani, D.S.M.; Sang, E.T.K.; Ceolin, D. Toxic Memes: A Survey of Computational Perspectives on the Detection and Explanation
+of Meme Toxicities. arXiv 2024, arXiv:2406.07353. [CrossRef]
+35. Liu, X.; Zhu, Y.; Lan, Y.; Yang, C.; Qiao, Y. Safety of Multimodal Large Language Models on Images and Texts. EasyChair preprint
+2023, 10743. [CrossRef]
+
+--- Page 20 ---
+Electronics 2025, 14, 3504 20 of 20
+36. Sivaananth, S.V.; Sivagireeswaran, S.; Ravindran, S.; Nabi, F.G. Two-Stage Classification of Offensive Meme Content and Analysis.
+In Proceedings of the 2024 IEEE 8th International Conference on Information and Communication Technology (CICT), Prayagraj,
+India, 6–8 December 2024; pp. 1–6.
+37. Rizwan, N.; Bhaskar, P.; Das, M.; Majhi, S.S.; Saha, P.; Mukherjee, A. Zero Shot VLMs for Hate Meme Detection: Are We There
+Yet? arXiv 2024, arXiv:2402.12198. [CrossRef]
+38. Briskilal, J.; Karthik, M.J.; Praneeth, S. Detection of Offensive Text in Memes Using Deep Learning Techniques. AIP Conf. Proc.
+2024, 3075, 020232. [CrossRef]
+39. Kmainasi, M.B.; Hasnat, A.; Hasan, M.A.; Shahroor, A.E.; Alam, F. MemeIntel: Explainable Detection of Propagandistic and
+Hateful Memes. arXiv 2025, arXiv:2502.16612. [CrossRef]
+40. Tabassum, I.; Nunavath, V. A Hybrid Deep Learning Approach for Multi-Class Cyberbullying Classification Using Multi-Modal
+Social Media Data. Appl. Sci. 2024, 14, 12007. [CrossRef]
+41. Ke, W.; Chan, K.-H. A Multilayer CARU Framework to Obtain Probability Distribution for Paragraph-Based Sentiment Analysis.
+Appl. Sci. 2021, 11, 11344. [CrossRef]
+Disclaimer/Publisher’s Note: The statements, opinions and data contained in all publications are solely those of the individual
+author(s) and contributor(s) and not of MDPI and/or the editor(s). MDPI and/or the editor(s) disclaim responsibility for any injury to
+people or property resulting from any ideas, methods, instructions or products referred to in the content.

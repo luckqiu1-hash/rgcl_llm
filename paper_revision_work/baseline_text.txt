@@ -1,0 +1,1179 @@
+--- Page 1 ---
+Improving Hateful Meme Detection through Retrieval-Guided Contrastive
+Learning
+Jingbiao Mei, Jinghong Chen, Weizhe Lin, Bill Byrne, Marcus Tomalin
+Department of Engineering
+University of Cambridge
+Cambridge, United Kingdom, CB2 1PZ
+{jm2245, jc2124, wl356, wjb31, mt126}@cam.ac.uk
+Abstract which consist of images accompanied by texts, are
+becoming a prominent form of online hate speech.
+Hateful memes have emerged as a significant
+This material can perpetuate stereotypes, incite dis-
+concern on the Internet. Detecting hateful
+crimination, and even catalyse real-world violence.
+memes requires the system to jointly under-
+To provide users the option of not seeing it, hate-
+stand the visual and textual modalities. Our
+ful memes detection systems have garnered sig-
+investigation reveals that the embedding space
+of existing CLIP-based systems lacks sensitiv- nificant interest in the research community (Kiela
+ity to subtle differences in memes that are vital et al., 2021; Suryawanshi et al., 2020b,a; Praman-
+for correct hatefulness classification. We pro- ick et al., 2021a; Liu et al., 2022; Hossain et al.,
+pose constructing a hatefulness-aware embed- 2022; Prakash et al., 2023; Sahin et al., 2023).
+ding space through retrieval-guided contrastive
+Correctly detecting hateful memes remains diffi-
+training. Our approach achieves state-of-the-
+cult. Previous literature has identified a prominent
+art performance on the HatefulMemes dataset
+with an AUROC of 87.0, outperforming much challenge in classifying "confounder memes", in
+larger fine-tuned large multimodal models. We which subtle differences in either image or text may
+demonstrate a retrieval-based hateful memes lead to a completely different meaning (Kiela et al.,
+detection system, which is capable of identify- 2021). As shown in Figure 1, the top left and top
+ing hatefulness based on data unseen in training.
+middle memes share the same caption. However,
+This allows developers to update the hateful
+one of them is hateful and the other benign de-
+memes detection system by simply adding new
+pending on the accompanying images. Confounder
+examples without retraining — a desirable fea-
+memes resemble real memes on the Internet, where
+ture for real services in the constantly evolving
+landscape of hateful memes on the Internet. the combined message of images and texts con-
+tribute to their hateful nature. Even state-of-the-art
+This paper contains content for demonstration models, such as HateCLIPper (Kumar and Nan-
+purposes that may be disturbing for some readers. dakumar, 2022), exhibit limited sensitivity to nu-
+anced hateful memes.
+1 Introduction
+We find that a key factor contributing to mis-
+classification is that confounder memes are located
+in close proximity in the embedding space due
+to the similarity of text or image content. For
+instance, HateCLIPper’s embedding of the con-
+Prediction: Benign ✗ Benign ✓ Benign ✓ founder meme in Figure 1 has a high cosine simi-
+larity score with the left anchor meme even though
+Figure 1: Illustrative examples from Kiela et al. 2021.
+they have opposite meanings. This poses chal-
+The meme on the left is hateful, the middle one is a
+lenges for the classifier to distinguish harmful and
+benign image confounder, and the right one is a benign
+benign memes.
+text confounder. We show HateCLIPper’s (Kumar and
+Nandakumar, 2022) prediction below each meme. Hate- We propose “Retrieval-Guided Contrastive
+CLIPper misclassifies the hateful meme on the left as Learning” (RGCL) to learn hatefulness-aware vi-
+benign. sion and language joint representations. We align
+the embeddings of same-class examples that are se-
+The growth of social media has been accompa- mantically similar with pseudo-gold positive exam-
+nied by a surge in hateful content. Hateful memes, ples and separate the embeddings of opposite-class
+5333
+Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), pages 5333–5347
+August 11-16, 2024 ©2024 Association for Computational Linguistics
+
+--- Page 2 ---
+examples with hard negative examples. We dy- (Chen et al., 2020) use Faster R-CNN (Ren et al.,
+namically retrieve these examples during training 2015) based object detectors (Anderson et al., 2018;
+and train with a contrastive objective in addition to Zhang et al., 2021) as the vision model. The use
+cross-entropy loss. RGCL achieves higher perfor- of such object detectors results in high inference
+mance than state-of-the-art large multimodal sys- latency (Kim et al., 2021).
+tems on the HatefulMemes dataset with far fewer
+model parameters. We demonstrate that the RGCL CLIP-based systems have gained popularity for
+embedding space enables the use of K-nearest- detecting hateful memes due to their simpler end-
+neighbor majority voting classifier. The encoder to-end architecture. HateCLIPper (Kumar and Nan-
+trained on HarMeme (Pramanick et al., 2021a) can dakumar, 2022) explored different types of modal-
+be applied to HatefulMemes (Kiela et al., 2021) ity interaction for CLIP vision and language repre-
+without additional training while maintaining high sentations to address challenging hateful memes. In
+AUC and accuracy using the KNN majority voting this paper, we show that such CLIP-based models
+classifier, even outperforming large multi-modal can achieve better performance with our proposed
+models under similar settings. This allows efficient retrieval-guided contrastive learning.
+transfer and update of hateful memes detection
+systems to handle the fast-evolving landscape of LMMs like Flamingo (Alayrac et al., 2022) and
+hateful memes in real-life applications. Our contri- LENS (Berrios et al., 2023) have demonstrated
+butions are: their effectiveness in detecting hateful memes.
+Flamingo 80B achieves a state-of-the-art AUROC
+1. We propose RGCL for hateful memes detec-
+of 86.6, outperforming previous CLIP-based sys-
+tion which learns a hatefulness-aware embed-
+tems although requiring an expensive fine-tuning
+ding space via an auxiliary contrastive objec-
+process.
+tive with dynamically retrieved examples. We
+propose to leverage novel pseudo-gold posi-
+Contrastive Learning is widely used in vision
+tive examples to improve the quality of posi-
+tasks (Schroff et al., 2015; Song et al., 2016; Har-
+tive examples.
+wood et al., 2017; Suh et al., 2019) and retrieval
+2. Our proposed approach achieves state-of-the- tasks , however, its application to multimodally pre-
+art performance on HatefulMemes and the trained encoders for hateful memes has not been
+HarMeme. We show RGCL’s capability well-explored. Lippe et al. (2020) incorporated
+across various domains of meme classifica- negative examples in contrastive learning for de-
+tion tasks on MultiOFF, Harm-P and Memo- tecting hateful memes. However, due to the low
+tion7K. quality of randomly sampled negative examples,
+they observed a degradation in performance. In
+3. Our retrieval-based KNN majority voting clas-
+contrast, our paper shows that by incorporating dy-
+sifier facilitates straightforward updates and
+namically sampled positive and negative examples,
+extensions of hateful meme detection systems
+the system is capable of learning a hatefulness-
+across various domains without retraining.
+aware vision and language joint representation.
+With RGCL training, the retrieval-based clas-
+sifier demonstrates strong cross-dataset gener-
+Sparse retrieval methods, such as BM-25 (Robert-
+alizability, making it suitable for real services
+son and Zaragoza, 2009) have been used in con-
+in the dynamic environment of online hateful
+trastive learning to obtain collections of hard
+memes.
+triplets (Karpukhin et al., 2020; Schroff et al., 2015;
+Khattab and Zaharia, 2020; Nguyen et al., 2023).
+2 Related Work
+In contrast, dense retrieval, which is based on vec-
+Hateful Meme Detection Systems in previous tor similarity scores, has been widely adopted for
+work can be categorized into three types: Object various passage retrieval tasks (Karpukhin et al.,
+Detector (OD)-based vision and language models, 2020; Santhanam et al., 2022; Diaz et al., 2021;
+CLIP (Radford et al., 2021) encoder-based systems, Herzig et al., 2021; Lin et al., 2023, 2024). Our
+and Large Multimodal Models (LMM). method leverages dense retrieval to dynamically
+OD-based models such as VisualBERT (Li et al., select both hard negative and pseudo-gold positive
+2019), OSCAR (Li et al., 2020), and UNITER examples.
+5334
+
+--- Page 3 ---
+Figure 2: Model overview. 1 Using VL Encoder to extract the joint vision-language representation for a training
+F
+example i. Additionally, the VL Encoder encodes the training memes into a retrieval database G. 2 During training,
+pseudo-gold and hard negative examples are obtained using the Faiss nearest neighbour search. During inference, K
+nearest neighbours are obtained using the same querying process to perform the KNN-based inference. 3 During
+training, we optimise the joint loss function . 4 For inference, we use conventional logistic classifier and our
+L
+proposed retrieval-based KNN majority voting. For a test meme j, we denote the prediction from logistic regression
+and KNN classifier as yˆ and yˆ , respectively.
+j j′
+3 RGCL Methodology trastive learning examples: (1) pseudo-gold posi-
+tive; (2) hard negative; (3) in-batch negative to train
+In each training example (I , T , y ) N , I
+{ i i i }i=1 i ∈ our proposed retrieval-guided contrastive loss.
+R C × H × W is the image portion of the meme in
+(1) Pseudo-gold positive examples are same-
+pixels; T is the caption overlaid on the meme;
+i
+label samples in the training set that have high
+y 0, 1 is the meme label, where 0 stands for
+i
+∈ { } similarity scores under the embedding space. Incor-
+benign, 1 for hateful.
+porating these examples pulls same-label memes
+We leverage a Vision-Language (VL) encoder
+with similar semantic meanings closer in the em-
+to extract image-text joint representations from the
+bedding space.
+image and the overlaid caption:
+(2) Hard negative examples (Schroff et al., 2015)
+g i = (I i , T i ) (1) are opposite-label samples in the training set that
+F
+have high similarity scores under the embedding
+We encode the training set with our VL encoder to
+space. These examples are often confounders of
+obtain the encoded retrieval vector database G:
+the anchor memes. By incorporating hard nega-
+G = (g , y ) N (2)
+{ i i }i=1 tive examples, we enhance the embedding space’s
+We index this retrieval database with Faiss (John- ability to distinguish between confounder memes.
+son et al., 2019) to perform training and retrieval- (3) For a training sample i, the set of in-batch
+based KNN classification. negative examples (Yih et al., 2011; Henderson
+As shown in Figure 2, the VL encoder comprises et al., 2017) are the examples in the same batch that
+a frozen CLIP encoder followed by a trainable mul- have a different label as the sample i. In-batch neg-
+tilayer perceptron (MLP). The frozen CLIP encoder ative examples introduce diverse gradient signals in
+encodes the text and image into embeddings that the training and this causes the randomly selected
+are then fused into a joint VL embedding before in-batch negative memes to be pushed apart in the
+feeding into the MLP. embedding space.
+We use HateCLIPper (Kumar and Nandakumar, Next, we describe how we obtain these exam-
+2022) as our frozen CLIP encoder. The model ples to train the system with Retrieval-Guided Con-
+architecture is detailed in Appendix C. In Sec.4.4, trastive Loss.
+we compare different choices of the frozen CLIP
+3.1.1 Finding pseudo-gold positive examples
+encoder to demonstrate that our approach does not
+and hard negative examples
+depend on any particular base model.
+For a training sample i, we obtain the pseudo-gold
+3.1 Retrieval Guided Contrastive Learning
+positive example and hard negative example from
+For each meme in the training set (the “anchor the training set with Faiss nearest neighbour search
+meme”), we dynamically obtain three types of con- (Johnson et al., 2019) which computes the similar-
+5335
+
+--- Page 4 ---
+ity scores between sample i’th embedding vector g which relies on the inherent discrimination capabil-
+i
+and any target embedding vector g G. The en- ity of the trained joint embedding space. Only
+j
+∈
+coded retrieval vector database G is updated after when the trained embedding space successfully
+each epoch. splits hateful and benign examples will majority
+We denote the pseudo-gold positive example’s voting achieve reasonable performance. The KNN
+embedding vector: classifier is suitable for real services in the con-
+stantly evolving landscape of online hateful memes
+g i + = argmax sim(g i , g j ), (3) as the the retrieval database can be extended with-
+gj∈ G/gi,yi=yj
+out the need to retrain the system. In Section 4.2,
+we show that our proposed KNN classifier general-
+similarly for the hard negative example’s embed-
+izes well to unseen data without additional training.
+ding vector:
+For a test meme t, we retrieve K memes located
+g i− = argmax sim(g i , g j ). (4) in close proximity within the embedding space
+gj∈ G,yi̸ =yj from the retrieval vector database G (see Eq. 2).
+We keep a record of the retrieved memes’ labels
+We use cosine similarity for similarity measures.
+y and similarity scores s = sim(g , g ) with the
+k k k t
+We denote the embedding vectors for the in-
+test meme t, where g is the embedding vector of
+t
+batch negative examples as { g i−,1 , g i−,2 , ..., g i − ,n −} . the test meme t. We perform similarity-weighted
+We concatenate the hard negative example with the
+majority voting to obtain the prediction:
+in-batch negative examples to form the set of nega-
+t
+3
+i
+.
+v
+1
+e
+.2
+exa
+R
+m
+G
+pl
+C
+es
+L
+G
+tr
+−i
+ai
+=
+nin
+{
+g
+g i−
+an
+, g
+d
+i−,
+i
+1
+n
+,
+f
+g
+e
+i
+r
+−,
+e
+2
+n
+, .
+c
+.
+e
+., g i − ,n −}
+yˆ t′ = σ(
+K
+y¯ k
+·
+s k ), (7)
+k=1
+X
+Following previous work (Kumar and Nandakumar,
+where σ( ) is the sigmoid function and
+2022; Kiela et al., 2021; Pramanick et al., 2021b), ·
+we use logistic regression to perform memes classi-
+1 if y = 1
+k
+fication as shown in Figure 2. We denote the output y¯ k := . (8)
+from the logistic regression as yˆ j for sample j. ( − 1 if y k = 0
+To train the logistic classifier and the MLP
+We conduct experiments in Sec. 4.2 to show that
+within the VL Encoder, we optimize a joint loss
+applying RGCL leads to much better performance
+function. The loss function consists of our pro-
+with retrieval-based KNN inference than using only
+posed Retrieval-Guided Contrastive Learning Loss
+the cross-entropy loss.
+(RGCLL) and the conventional cross-entropy (CE)
+loss for logistic regression: 4 RGCL experiments
+= RGCLL + CE We primarily evaluate the performance of RGCL on
+L i Li Li the HatefulMemes dataset (Kiela et al., 2021) and
+= RGCLL + (y log yˆ + (1 y ) log(1 yˆ )),
+Li i i − i − i the HarMeme dataset (Pramanick et al., 2021a).
+(5)
+The HarMeme dataset consists of COVID-19-
+related harmful memes collected from Twitter. In
+where the RGCLL is computed as:
+Section 4.7, we evaluate three additional datasets
+RGCLL = L(g , g+, G ) to show the generalizability of RGCL beyond hate-
+Li i i −i
+ful meme classification. The dataset statistics are
+esim(gi,g
+i
++)
+shown in Appendix D.
+= log .
+− esim(gi,g i +) + esim(gi,g) To make a fair comparison, we adopt the evalua-
+g
+∈
+G−i
+tion metrics used in previous literature (Kumar and
+(6)
+P
+Nandakumar, 2022; Cao et al., 2022; Kiela et al.,
+In Appendix G, we compare different similarity 2021) for HatefulMemes and HarMeme: Area Un-
+metrics and loss functions. der the Receiver Operating Characteristic Curve
+(AUC) and Accuracy (Acc).
+3.2 Retrieval-based KNN classifier
+The experiment setup, including the statistical
+In addition to logistic classifier, we introduce significance tests, and hyperparameter settings are
+a retrieval-based KNN majority voting classifier detailed in Appendices A and B.
+5336
+
+--- Page 5 ---
+4.1 Comparing RGCL with baseline systems HatefulMemes HarMeme
+Model AUC Acc. AUC Acc.
+Table 1 presents the experimental results with lo-
+Object Detector based models
+gistic regression. RGCL is compared to a range
+ERNIE-Vil 79.7 72.7 - -
+of baseline models including OD-based models,
+UNITER 79.1 70.5 - -
+LMMs, and CLIP-based systems. On the Hate- OSCAR 78.7 73.4 - -
+fulMemes dataset, RGCL obtains an AUC of
+Fine-tuned Large Multimodal Models
+87.0% and an accuracy of 78.8%, outperforming
+Flamingo-80B1 86.6 - - -
+all baseline systems, including the 200 times larger
+LLaVA (Vicuna-13B) 85.3 77.3 90.8 83.3
+Flamingo-80B.
+Systems based on CLIP
+OD-based models
+CLIP 79.8 72.0 82.6 76.7
+ERNIE-Vil (Yu et al., 2021), UNITER (Chen et al.,
+MOMENTA 69.2 61.3 86.3 80.5
+2020) and OSCAR (Li et al., 2020) performs simi- PromptHate 81.5 73.0 90.9 84.5
+larly with AUC scores of around 79%. HateCLIPper2 85.5 76.0 89.7 84.8
+HateCLIPper w/ RGCL 87.0 78.8 91.8 87.0
+LMMs
+Flamingo-80B (Alayrac et al., 2022) is the previ-
+Table 1: Comparing RGCL with baseline systems. Best
+ous state-of-the-art model for HatefulMemes, with
+performance is in bold.
+an AUC of 86.6%. We also fine-tune LLaVA (Liu
+et al., 2023) with the procedure in Appendix E.
+LLaVA achieves 77.3% accuracy and 85.3% AUC, HatefulMemes dataset. We report the performance
+performing worse than the much larger Flamingo, of the KNN classifier when using the HarMeme
+but better than OD-based models. and HatefulMemes dataset as the retrieval database
+CLIP-based systems in Table 2 (II) and (III) respectively. We only use
+PromptHate (Cao et al., 2022) and HateCLIPper the training set as the retrieval database to avoid
+(Kumar and Nandakumar, 2022), built on top of label leaking.
+CLIP (Radford et al., 2021), outperform both the We compare our method with state-of-the-art
+original CLIP and OD-based models. HateCLIPper LMMs, including Flamingo (Alayrac et al., 2022),
+achieves an AUC of 85.5%, surpassing the original Lens (Berrios et al., 2023), Instruct-BLIP (Ouyang
+CLIP (79.8% AUC) but falling short of Flamingo- et al., 2022) and LLaVA (Liu et al., 2023) as shown
+80B (86.6% AUC). Our system, utilising Hate- in Table 2 (I). We report the zero-shot performance
+CLIPper’s modelling, improves over HateCLIPper of these LMMs to replicate the scenario when
+by nearly 3% in accuracy, reaching 78.8%. For the the model predicts the unseen domain of hateful
+AUC score, our system achieves 87.0%, surpassing memes. To ensure a fair comparison, we report the
+the previous state-of-the-art Flamingo-80B. performance of LLaVA fine-tuned on the HarMeme
+For HarMeme, RGCL obtained an accuracy of to align with RGCL’s setting in Table 2 (II) and
+87%, outperforming HateCLIPper with an accu- (III).
+racy of 84.8%, PromptHate with an accuracy of Lastly, we also report the performance of our
+84.5% and LLaVA with an accuracy of 83.3%. methods when trained and evaluated on Hateful-
+Our system’s state-of-the-art performance on the Memes in Table 2 (IV).
+HarMeme dataset further emphasises RGCL’s ro- (I) We report LMMs with diverse backbone
+bustness and generalisation capacity to different language models, ranging from Flan-T5 (Chung
+types of hateful memes. et al., 2022) and the more recent Vicuna (Chiang
+et al., 2023). Among these models, Lens with
+4.2 Performance with retrieval-based KNN Flan-T5XXL 11B performs the best, achieving an
+classifier AUC of 59.4%. When LLaVA is fine-tuned on the
+Online hate speech is constantly evolving, and it is HarMeme dataset and evaluated on the Hateful-
+not practical to keep retraining the detection system. Memes dataset, its performance does not improve
+We demonstrate that our system can effectively beyond its zero-shot performance. Its accuracy
+transfer to the unseen domain of hateful memes drops from 54.8% in zero-shot to 54.3% in fine-
+without retraining.
+1Since Flamingo is not open-sourced, we are unable to
+We train HateCLIPper with and without RGCL
+obtain accuracy.
+using the HarMeme dataset and evaluate on the 2Reproduced with HateCLIPper’s code base.
+5337
+
+--- Page 6 ---
+Model AUC Acc. AUC and 78.3% accuracy. These scores also
+surpass all baseline systems including fine-tuned
+(I) Zero shot based on Large Multimodal Models
+LMMs in Table 1.
+Flamingo-80B 46.4 -
+Lens (Flan-T5 11B) 59.4 -
+InstructBLIP (Flan-T5 11B) 54.1 - 4.3 Effects of incorporating pseudo-gold
+InstructBLIP (Vicuna 13B) 57.5 - positive and hard negative examples
+LLaVA (Vicuna 13B) 57.9 54.8
+fine-tuned on HarMeme 56.3 54.3 In Table 3, we report a comparative analysis by
+examining performance when specific examples
+(II) Train and retrieve on HarMeme
+are excluded during the training process.
+HateCLIPper 55.8 51.9
+LR instead of KNN 52.4 49.5 When we omit the pseudo-gold positive exam-
+HateCLIPper w/ RGCL 60.0 (+4.2) 57.2 (+5.3) ples, only in-batch positive examples are incorpo-
+LR instead of KNN 59.4 (+7.0) 50.9 (+1.4)
+rated during the training. This results in an accu-
+(III) Train on HarMeme, retrieve on HatefulMemes racy degradation of 1.5%. Hard positive examples,
+HateCLIPper 54.4 50.3 same-label samples with high similarity scores, are
+HateCLIPper w/ RGCL 66.6 (+12.2) 59.9 (+9.6)
+commonly used in contrastive learning literature.
+(IV) Train and retrieve on HatefulMemes In our case, when incorporating hard positive ex-
+HateCLIPper 84.6 73.3 amples rather than pseudo-gold positive examples,
+HateCLIPper w/ RGCL 86.7 (+2.1) 78.3 (+5.0) the training becomes unstable and results in diver-
+gence.
+Table 2: Retrieval-based KNN classifier results on Hate-
+When the hard negative examples are excluded,
+fulMemes. LR refers to logistic regression.
+leaving only in-batch negative samples, the per-
+formance degrades 1.7% for accuracy. When re-
+tuned. These findings indicate that the fine-tuned moving both types of examples, there is more per-
+LLaVA struggles to generalise effectively to di- formance degradation. Both the pseudo-gold posi-
+verse domains of hateful memes. tive examples and the hard negative examples are
+(II) When using the HarMeme as the retrieval needed for accurately classifying hateful memes.
+database, our system achieves an AUC of 60.0%, When excluding the in-batch negative examples,
+surpassing both the baseline HateCLIPper’s AUC training becomes unstable and fail to converge,
+of 55.8% and the best LMM’s zero-shot AUC which is consistent with previous findings in (Hen-
+score. derson et al., 2017).
+Additionally, we provide the results of using lo-
+gistic regression (LR) as an alternative to the KNN Model AUC Acc.
+classifier, both with and without RGCL training,
+Baseline RGCL 87.0 78.8
+when systems trained on HarMeme are tested on
+w/o Pseudo-Gold positive 86.0 77.3
+HatefulMemes. The performance of logistic regres- w/o Hard negative 86.1 77.1
+sion consistently falls short of the KNN classifier. w/o Hard negative and Pseudo-gold
+85.5 76.8
+positive
+Logistic regression with RGCL training achieves
+an AUC of 59.4%, outperforming the HateCLIP-
+Table 3: Ablation study on omitting Hard negative
+per’s baseline by 7%. Note that the logistic regres- and/or Pseudo-Gold positive examples on the Hateful-
+sion does not the retrieval of examples. Memes
+(III) When using HatefulMemes as the retrieval
+database, the HateCLIPper’s performance degrades,
+4.4 Effects of different VL Encoder
+suggesting its embedding space lacks generalizing
+capability to different domains of hateful memes. We ablate the performance when incorporating
+RGCL boosts the AUC to 66.6%, outperforming RGCL on various VL encoders. As shown in Ta-
+the baseline by a large margin of 12.2%. RGCL ble 4, we experiment with various encoders in the
+achieves an accuracy of 59.9%, surpassing the base- CLIP family: the original CLIP (Radford et al.,
+line by 9.6%. RGCL’s AUC and accuracy score 2021), OPENCLIP (Ilharco et al., 2021; Schuh-
+also surpass the zero-shot LMMs. mann et al., 2022; Cherti et al., 2023), and AltCLIP
+(IV) When our system is trained and evaluated (Chen et al., 2022). Our method boosts the per-
+on the HatefulMemes dataset (the same system formance of all these variants of CLIP by around
+from Table 1), the KNN classifier obtains 86.7% 3%.
+5338
+
+--- Page 7 ---
+To verify that our method does not depend on the tween the two loss functions. We observe a signifi-
+CLIP architecture, we carry out experiments with cant performance improvement whenever RGCLL
+ALIGN3 (Jia et al., 2021). As shown in Table 4, is included. For simplicity, we maintain a 1:1 mix-
+RGCL enhances the AUC score by a margin of ing ratio. Notably, in the absence of cross-entropy
+4.4% over the baseline ALIGN model. loss, we identified several examples where models
+with RGCL fail but models without RGCL suc-
+Model AUC Acc. ceed. Conversely, inclusion of cross-entropy loss
+CLIP 79.8 72.0 eliminates such discrepancies.
+CLIP w/ RGCL 83.8 (+4.0) 75.8 (+3.8)
+OpenCLIP 82.9 71.7 RGCLL:CE Acc. AUC
+OpenCLIP w/ RGCL 84.1 (+1.2) 75.1 (+3.4)
+0:1 76.0 85.5
+AltCLIP 83.4 74.1 0.5:1 78.5 86.8
+AltCLIP w/ RGCL 86.5 (+3.1) 76.8 (+2.7) 1:1 78.8 87.0
+2:1 79.1 86.9
+ALIGN 73.2 66.8
+4:1 78.6 86.9
+ALIGN w/ RGCL 77.6 (+4.4) 68.9 (+2.1)
+1:0 79.0 86.5
+Table 4: Ablation study on various VL encoders on the
+Table 6: Ablation study of different mixing ratios for the
+HatefulMemes dataset
+two type of loss functions on the HatefulMemes dataset
+4.5 Effects of dense/sparse retrieval
+4.7 Effects of RGCL on different Meme
+We compare the commonly used sparse retrieval to Classification tasks
+our proposed dynamic dense retrieval for obtain-
+To demonstrate RGCL’s versatility beyond hateful
+ing contrastive learning examples. We detail our
+meme classification, we assess its efficacy on three
+approach for sparse retrieval in Appendix H.
+additional datasets: MultiOFF (Suryawanshi et al.,
+As shown in Table 5, using a variable number
+2020a), Harm-P (Pramanick et al., 2021b), and
+of objects in object detection performs the best in
+Memotion7K (Sharma et al., 2020). These datasets
+sparse retrieval. However, the accuracy degrades
+originally used the F1 score as their evaluation met-
+by 0.7% compared to the dense retrieval baseline.
+ric; we also include Accuracy. We train a separate
+When using a fixed number of objects in object
+model for each of the datasets following the pro-
+detection, the performance degrades even more.
+cedures detailed in Appendices A and B. Table 7
+Our proposed dynamic dense retrieval obtains bet-
+shows the results for CLIP with and without RGCL
+ter performance than the commonly used sparse
+training on these three datasets4.
+retrieval methods.
+MultiOFF contains memes related to the 2016
+U.S. presidential election sourced from social me-
+Model AUC Acc.
+dia sites, such as Twitter and Instagram. The
+Baseline with Dense Retrieval 87.0 78.8
+memes are labeled as non-offensive and offensive.
+w/ Variable No. of objects 87.0 78.1
+MultiOFF is a relatively small dataset, containing
+w/ 72 objects 86.1 77.1
+w/ 50 objects 85.9 78.6 less than 500 training examples. RGCL outper-
+forms the baseline by a significant margin of 4.7%
+Table 5: Ablation study of Dense retrieval and Sparse in accuracy. RGCL yields consistent gain even
+retrieval to obtain pseudo-gold positive examples and
+with relatively small datasets.
+hard negative examples on the HatefulMemes dataset
+Harm-P contains harmful and harmless memes
+on US politics sourced from social media sites.
+RGCL shows more than 2% gain in both accuracy
+4.6 Effects of Retrieval-Guided Contrastive
+and F1 score over the baseline system.
+Learning Loss
+Memotion7K, designed for multi-task meme
+As shown in Eq. 5, the mixing ratio between
+emotion analysis, includes annotations for humor,
+RGCLL and the CE loss is 1:1 by default. In Ta-
+sarcasm, offensiveness, and motivation. RGCL
+ble 6, we compare the different mixing ratios be-
+4Since CLIP surpasses almost all other prior published
+3ALIGN only open-sourced the base model which is less systems on these datasets, we do not include prior results in
+capable than the larger CLIP-based models. the comparison.
+5339
+
+--- Page 8 ---
+shows improvement over baseline across all four 6 Conclusion
+emotion classification tasks with an average gain
+We introduce Retrieval-Guided Contrastive Learn-
+of more than 3% on both accuracy and F1 scores.
+ing to enhance any VL encoder in addressing chal-
+These results highlight RGCL’s capability for im-
+lenges in distinguishing confounding memes. Our
+proving emotion detection.
+approach uses novel auxiliary loss with dynami-
+cally retrieved examples and significantly improves
+w/o RGCL w/ RGCL
+contextual understanding. Achieving an AUC score
+Dataset Acc. F1 Acc. F1
+of 87.0% on the HatefulMemes dataset, our sys-
+MultiOFF 62.4 54.8 67.1 (+4.7) 58.1 (+3.3)
+tem outperforms prior state-of-the-art models. Our
+Harm-P 87.6 86.9 89.9 (+2.3) 89.5 (+2.6)
+approach also transfers to different tasks, empha-
+Memotion7K
+sizing its usefulness across diverse meme domains.
+-Humour 73.0 83.8 76.3 (+3.3) 86.6 (+2.4)
+-Sarcasm 75.1 85.6 77.3 (+2.2) 87.2 (+1.6)
+-Offensive 72.8 83.5 77.6 (+4.8) 87.4 (+3.9) Limitation
+-Motivation 59.6 72.6 62.4 (+2.8) 76.8 (+4.2)
+Average 70.1 81.4 73.4 (+3.3) 84.5 (+3.1) Hate speech can be defined by different terminolo-
+gies, such as online harassment, online aggression,
+Table 7: The performance of CLIP with and without cyberbullying, or harmful speech. United Nations
+RGCL training on different meme classification tasks
+Strategy and Plan of Action on Hate Speech stated
+that the definition of hateful could be controver-
+sial and disputed (Nderitu, 2020). Additionally,
+5 Case Analysis
+according to the UK’s Online Harms White Paper,
+harms could be insufficiently defined (Woodhouse,
+We now analyze how RGCL improves relative to
+2022). We use the definition of hate speech from
+baseline systems on confounding memes.
+the two datasets: HatefulMemes (Kiela et al., 2021)
+and HarMeme (Pramanick et al., 2021a). These
+5.1 Quantitative analysis
+datasets adopt Facebook’s definition of hate speech
+From the 500 validation samples of HatefulMemes, 5 to strike a balance between reducing harm and
+we annotated 101 examples and picked 24 con-
+preserving freedom of speech. Tackling the com-
+founder memes. On this confounder subset, Hate-
+plex issue of how to define hate speech will require
+CLIPper without RGCL obtains an accuracy of
+a cooperative effort by stakeholders, including gov-
+66.7%, while RGCL significantly boosts the accu-
+ernmental policy makers, academic scholars, the
+racy to 83.3%. These results show that RGCL im-
+United Nations Human Rights Council, and social
+proves the classification of challenging confounder
+media companies. We align our research with the
+memes, which exhibit differences in either the im-
+ongoing process of defining the hate speech prob-
+age or text.
+lem and will continue to integrate new datasets, as
+Next, we analyze how RGCL improves the clas-
+they become available.
+sification through examples of confounder memes
+In examining the error cases of our system, we
+from the subset.
+find that the system is unable to recognize subtle
+facial expressions. This can be improved by using
+5.2 Qualitative analysis
+a more powerful vision encoder to enhance image
+In Table 8, we demonstrate how RGCL addresses understanding. We leave this to future work.
+the classification errors associated with confounder
+Ethical Statement
+memes. Our approach significantly reduces the
+similarity scores between anchor memes and con-
+Reproducibility. We present the detailed experi-
+founder memes. This shows that RGCL effectively
+ment setups and hyperparameter settings in Appen-
+learns a hatefulness-aware embedding space, plac-
+dices A and B. The source code will be released
+ing the meme within the embedding space with a
+upon publication.
+comprehensive hateful understanding derived from
+both vision and language components. By align- Usage of Datasets. The HatefulMemes,
+ing semantically similar memes closer and push- HarMeme, MultiOFF, and Harm-P datasets were
+ing apart dissimilar ones in the embedding space,
+5https://transparency.fb.com/en-gb/policies/community-
+RGCL enhances classification accuracy. standards/hate-speech/
+5340
+
+--- Page 9 ---
+(a)
+Anchor memes Image confounders Text confounders
+Ground truth labels Hateful Benign Benign
+Meme
+HateCLIPper
+Probability 0.454 0.000 0.001
+Prediction Benign ✗ Benign Benign
+Similarity with anchor - 0.702 0.733
+HateCLIPper w/ RGCL (Ours)
+Probability 0.999 0.000 0.000
+Prediction Hateful ✓ Benign Benign
+Similarity with anchor - -0.751 -0.571
+(b)
+Meme
+HateCLIPper
+Probability 0.038 0.000 0.001
+Prediction Benign ✗ Benign Benign
+Similarity with anchor - 0.898 0.913
+HateCLIPper w/ RGCL (Ours)
+Probability 1.00 0.000 0.000
+Prediction Hateful ✓ Benign Benign
+Similarity with anchor - -0.803 -0.769
+(c)
+Meme
+HateCLIPper
+Probability 0.385 0.001 0.005
+Prediction Benign ✗ Benign Benign
+Similarity with anchor - 0.869 0.781
+HateCLIPper w/ RGCL (Ours)
+Probability 0.996 0.000 0.000
+Prediction Hateful ✓ Benign Benign
+Similarity with anchor - -0.980 -0.998
+Table 8: Visualisation for the confounder memes in the HatefulMemes dataset. We present triplets of memes
+including the hateful anchor memes, the benign image confounders and the benign text confounders. We show
+the output hateful probability and predictions from HateCLIPper and our RGCL system. We provide the cosine
+similarity score between the anchor meme and its corresponding confounder meme.
+5341
+
+--- Page 10 ---
+curated and designed to help fight online hate Acknowledgments
+speech for research purposes only. Throughout the
+Jingbiao Mei is supported by Cambridge Common-
+research, we strictly follow the terms of use set by
+wealth, European and International Trust for the
+their authors.
+undertaking of the PhD in Engineering at the Uni-
+Societal benefits. Hate speech detection systems versity of Cambridge.
+like RGCL contribute significantly to reducing on- Jinghong Chen is supported by the Warwick
+line hate speech, promoting safer digital environ- Postgraduate Studentship from Christ’s College
+ments, and aiding in protecting human content mod- and the Huawei Hisilicon Studentship for the under-
+erators. These positive impacts, we believe, are taking of the PhD in Engineering at the University
+substantial and crucial in the broader context of of Cambridge.
+online communication and safety. Weizhe Lin is supported by a Research
+Studentship funded by Toyota Motor Europe
+Intended use. We intend to enforce strict access
+(RG92562(24020)) for the undertaking of the PhD
+controls upon the model release. The model will
+in Engineering at the University of Cambridge.
+only be shared with researchers after signing the
+Prof. Bill Byrne holds concurrent appointments
+terms of use. We will clearly state that the system
+as a Professor of Information Engineering at Cam-
+is intended for the detection and prevention of hate-
+bridge University and as an Amazon Scholar. This
+ful speech. We will specify that it should not be
+publication describes work performed at Cam-
+used for any purposes that promote, condone, or
+bridge University and is not associated with Ama-
+encourage hate speech or harmful content.
+zon.
+Implementation consideration. Because our We would also like to thank all the reviewers for
+system is based on retrieving examples, multiple their knowledgeable reviews.
+retrieval sets reflect different cultural sensitivities
+that can be applied in reality. Our architecture is
+well suited to addressing the problem of cultural References
+differences or subjective topics without retraining. Jean-Baptiste Alayrac, Jeff Donahue, Pauline Luc,
+However, the annotation of datasets in handling Antoine Miech, Iain Barr, Yana Hasson, Karel
+cultural differences or subjective topics needs to Lenc, Arthur Mensch, Katherine Millican, Malcolm
+Reynolds, Roman Ring, Eliza Rutherford, Serkan
+be take into consideration before any deployment
+Cabi, Tengda Han, Zhitao Gong, Sina Samangooei,
+of systems. The factors need to be considered in-
+Marianne Monteiro, Jacob L. Menick, Sebastian
+cludes the data curation guidelines, bias of the an- Borgeaud, Andy Brock, Aida Nematzadeh, Sahand
+notators, and the limited definition of hate speech. Sharifzadeh, Mikołaj Bin´kowski, Ricardo Barreira,
+Oriol Vinyals, Andrew Zisserman, and Karén Si-
+Misuse Potential. Our proposed system does not monyan. 2022. Flamingo: a visual language model
+for few-shot learning. Advances in Neural Informa-
+induce biases. However, training the system on
+tion Processing Systems, 35:23716–23736.
+HatefulMemes or HarMeme may cause uninten-
+tional biases towards certain individuals, groups, Peter Anderson, Xiaodong He, Chris Buehler, Damien
+and entities (Pramanick et al., 2021b). To coun- Teney, Mark Johnson, Stephen Gould, and Lei Zhang.
+2018. Bottom-up and top-down attention for image
+teract potential unfair moderation stemming from
+captioning and visual question answering. In 2018
+dataset-induced biases, incorporating human mod-
+IEEE/CVF Conference on Computer Vision and Pat-
+eration is necessary. tern Recognition, page 6077–6086.
+Environmental Impact Training large-scale William Berrios, Gautam Mittal, Tristan Thrush, Douwe
+Transformer-based models requires a lot of compu- Kiela, and Amanpreet Singh. 2023. Towards lan-
+tations on GPUs/TPUs, which contributes to global guage models that can see: Computer vision through
+the lens of natural language. (arXiv:2306.16410).
+warming. However, this is a bit less of an issue for
+ArXiv:2306.16410 [cs].
+our system, since we only fine-tune small compo-
+nents of vision-language models. Our system can Rui Cao, Roy Ka-Wei Lee, Wen-Haw Chong, and Jing
+be trained under 30 minutes on a single GPU. The Jiang. 2022. Prompting for multimodal hateful meme
+classification. In Proceedings of the 2022 Confer-
+fine-tining takes far less time compared to LMMs.
+ence on Empirical Methods in Natural Language
+Moreover, as our model is relatively small, the in-
+Processing, pages 321–332, Abu Dhabi, United Arab
+ference cost is much less compared to LMMs. Emirates. Association for Computational Linguistics.
+5342
+
+--- Page 11 ---
+Gal Chechik, Varun Sharma, Uri Shalit, and Samy Ben- Ben Harwood, Vijay Kumar B. G, Gustavo Carneiro,
+gio. 2009. Large Scale Online Learning of Image Ian Reid, and Tom Drummond. 2017. Smart min-
+Similarity through Ranking, volume 5524 of Lecture ing for deep metric learning. (arXiv:1704.01285).
+Notes in Computer Science, page 11–14. Springer ArXiv:1704.01285 [cs].
+Berlin Heidelberg, Berlin, Heidelberg.
+Matthew Henderson, Rami Al-Rfou, Brian Strope, Yun-
+Yen-Chun Chen, Linjie Li, Licheng Yu, Ahmed hsuan Sung, Laszlo Lukacs, Ruiqi Guo, Sanjiv Ku-
+El Kholy, Faisal Ahmed, Zhe Gan, Yu Cheng, and mar, Balint Miklos, and Ray Kurzweil. 2017. Effi-
+Jingjing Liu. 2020. UNITER: UNiversal Image-TExt cient natural language response suggestion for smart
+Representation Learning, volume 12375 of Lecture reply. (arXiv:1705.00652). ArXiv:1705.00652 [cs].
+Notes in Computer Science, page 104–120. Springer
+International Publishing, Cham. Jonathan Herzig, Thomas Müller, Syrine Krichene, and
+Julian Martin Eisenschlos. 2021. Open domain ques-
+tion answering over tables via dense retrieval. arXiv.
+Zhongzhi Chen, Guang Liu, Bo-Wen Zhang, Fulong
+Ye, Qinghong Yang, and Ledell Wu. 2022. Alt-
+Eftekhar Hossain, Omar Sharif, and Mo-
+clip: Altering the language encoder in clip for ex-
+hammed Moshiul Hoque. 2022. Mute: A multimodal
+tended language capabilities. (arXiv:2211.06679).
+dataset for detecting hateful memes. In Proceedings
+ArXiv:2211.06679 [cs].
+of the 2nd Conference of the Asia-Pacific Chapter of
+the Association for Computational Linguistics and
+Mehdi Cherti, Romain Beaumont, Ross Wightman,
+the 12th International Joint Conference on Natural
+Mitchell Wortsman, Gabriel Ilharco, Cade Gordon,
+Language Processing: Student Research Workshop,
+Christoph Schuhmann, Ludwig Schmidt, and Jenia
+page 32–39, Online. Association for Computational
+Jitsev. 2023. Reproducible scaling laws for con-
+Linguistics.
+trastive language-image learning. In Proceedings
+of the IEEE/CVF Conference on Computer Vision
+Gabriel Ilharco, Mitchell Wortsman, Ross Wightman,
+and Pattern Recognition, pages 2818–2829.
+Cade Gordon, Nicholas Carlini, Rohan Taori, Achal
+Dave, Vaishaal Shankar, Hongseok Namkoong, John
+Wei-Lin Chiang, Zhuohan Li, Zi Lin, Ying Sheng,
+Miller, Hannaneh Hajishirzi, Ali Farhadi, and Lud-
+Zhanghao Wu, Hao Zhang, Lianmin Zheng, Siyuan
+wig Schmidt. 2021. Openclip. If you use this soft-
+Zhuang, Yonghao Zhuang, Joseph E. Gonzalez, Ion
+ware, please cite it as below.
+Stoica, and Eric P. Xing. 2023. Vicuna: An open-
+source chatbot impressing gpt-4 with 90%* chatgpt
+Chao Jia, Yinfei Yang, Ye Xia, Yi-Ting Chen, Zarana
+quality.
+Parekh, Hieu Pham, Quoc V. Le, Yunhsuan Sung,
+Zhen Li, and Tom Duerig. 2021. Scaling up vi-
+Hyung Won Chung, Le Hou, Shayne Longpre, Barret
+sual and vision-language representation learning
+Zoph, Yi Tay, William Fedus, Yunxuan Li, Xuezhi
+with noisy text supervision. (arXiv:2102.05918).
+Wang, Mostafa Dehghani, Siddhartha Brahma, Al-
+ArXiv:2102.05918 [cs].
+bert Webson, Shixiang Shane Gu, Zhuyun Dai,
+Mirac Suzgun, Xinyun Chen, Aakanksha Chowd-
+Jeff Johnson, Matthijs Douze, and Hervé Jégou. 2019.
+hery, Alex Castro-Ros, Marie Pellat, Kevin Robin-
+Billion-scale similarity search with GPUs. IEEE
+son, Dasha Valter, Sharan Narang, Gaurav Mishra,
+Transactions on Big Data, 7(3):535–547.
+Adams Yu, Vincent Zhao, Yanping Huang, Andrew
+Dai, Hongkun Yu, Slav Petrov, Ed H. Chi, Jeff Dean,
+Vladimir Karpukhin, Barlas Oguz, Sewon Min, Patrick
+Jacob Devlin, Adam Roberts, Denny Zhou, Quoc V.
+Lewis, Ledell Wu, Sergey Edunov, Danqi Chen, and
+Le, and Jason Wei. 2022. Scaling instruction-
+Wen-tau Yih. 2020. Dense passage retrieval for open-
+finetuned language models. (arXiv:2210.11416). domain question answering. In Proceedings of the
+ArXiv:2210.11416 [cs]. 2020 Conference on Empirical Methods in Natural
+Language Processing (EMNLP), page 6769–6781,
+Wenliang Dai, Junnan Li, Dongxu Li, Anthony Online. Association for Computational Linguistics.
+Meng Huat Tiong, Junqi Zhao, Weisheng Wang,
+Boyang Li, Pascale Fung, and Steven Hoi. 2023. In- Omar Khattab and Matei Zaharia. 2020. Colbert: Effi-
+structblip: Towards general-purpose vision-language cient and effective passage search via contextualized
+models with instruction tuning. (arXiv:2305.06500). late interaction over bert. In Proceedings of the 43rd
+ArXiv:2305.06500 [cs]. International ACM SIGIR Conference on Research
+and Development in Information Retrieval, SIGIR
+Fernando Diaz, Chirag Shah, Torsten Suel, Pablo ’20, page 39–48, New York, NY, USA. Association
+Castells, Rosie Jones, Tetsuya Sakai, Chen Qu, for Computing Machinery.
+Hamed Zamani, Liu Yang, W Bruce Croft, and Erik
+Learned-Miller. 2021. Passage retrieval for outside- Douwe Kiela, Hamed Firooz, Aravind Mohan, Vedanuj
+knowledge visual question answering. Proceedings Goswami, Amanpreet Singh, Pratik Ringshia, and
+of the 44th International ACM SIGIR Conference on Davide Testuggine. 2021. The hateful memes chal-
+Research and Development in Information Retrieval, lenge: Detecting hate speech in multimodal memes.
+page 1753–1757. (arXiv:2005.04790). ArXiv:2005.04790 [cs].
+5343
+
+--- Page 12 ---
+Wonjae Kim, Bokyung Son, and Ildoo Kim. 2021. Vilt: Long Ouyang, Jeff Wu, Xu Jiang, Diogo Almeida, Car-
+Vision-and-language transformer without convolu- roll L. Wainwright, Pamela Mishkin, Chong Zhang,
+tion or region supervision. In Proceedings of the Sandhini Agarwal, Katarina Slama, Alex Ray, John
+38th International Conference on Machine Learning, Schulman, Jacob Hilton, Fraser Kelton, Luke Miller,
+page 5583–5594. PMLR. Maddie Simens, Amanda Askell, Peter Welinder,
+Paul Christiano, Jan Leike, and Ryan Lowe. 2022.
+Gokul Karthik Kumar and Karthik Nandakumar. 2022.
+Training language models to follow instructions with
+Hate-CLIPper: Multimodal hateful meme classifica-
+human feedback.
+tion based on cross-modal interaction of CLIP fea-
+tures. In Proceedings of the Second Workshop on Nirmalendu Prakash, Ming Shan Hee, and Roy Ka-Wei
+NLP for Positive Impact (NLP4PI), pages 171–183, Lee. 2023. Totaldefmeme: A multi-attribute meme
+Abu Dhabi, United Arab Emirates (Hybrid). Associa- dataset on total defence in singapore. In Proceedings
+tion for Computational Linguistics. of the 14th Conference on ACM Multimedia Systems,
+MMSys ’23, page 369–375, New York, NY, USA.
+Liunian Harold Li, Mark Yatskar, Da Yin, Cho-Jui
+Association for Computing Machinery.
+Hsieh, and Kai-Wei Chang. 2019. Visualbert: A sim-
+ple and performant baseline for vision and language.
+Shraman Pramanick, Dimitar Dimitrov, Rituparna
+(arXiv:1908.03557). ArXiv:1908.03557 [cs].
+Mukherjee, Shivam Sharma, Md. Shad Akhtar,
+Preslav Nakov, and Tanmoy Chakraborty. 2021a. De-
+Xiujun Li, Xi Yin, Chunyuan Li, Pengchuan Zhang,
+tecting harmful memes and their targets. In Find-
+Xiaowei Hu, Lei Zhang, Lijuan Wang, Houdong Hu,
+ings of the Association for Computational Linguis-
+Li Dong, Furu Wei, Yejin Choi, and Jianfeng Gao.
+tics: ACL-IJCNLP 2021, pages 2783–2796, Online.
+2020. Oscar: Object-Semantics Aligned Pre-training
+Association for Computational Linguistics.
+for Vision-Language Tasks, volume 12375 of Lecture
+Notes in Computer Science, page 121–137. Springer
+Shraman Pramanick, Shivam Sharma, Dimitar Dim-
+International Publishing, Cham.
+itrov, Md. Shad Akhtar, Preslav Nakov, and Tanmoy
+Weizhe Lin, Jinghong Chen, Jingbiao Mei, Alexan- Chakraborty. 2021b. Momenta: A multimodal frame-
+dru Coca, and Bill Byrne. 2023. Fine-grained late- work for detecting harmful memes and their targets.
+interaction multi-modal retrieval for retrieval aug- In Findings of the Association for Computational
+mented visual question answering. In Advances in Linguistics: EMNLP 2021, page 4439–4455, Punta
+Neural Information Processing Systems, volume 36, Cana, Dominican Republic. Association for Compu-
+page 22820–22840. Curran Associates, Inc. tational Linguistics.
+Weizhe Lin, Jingbiao Mei, Jinghong Chen, and Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+Bill Byrne. 2024. Preflmr: Scaling up fine- Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sas-
+grained late-interaction multi-modal retrievers. try, Amanda Askell, Pamela Mishkin, Jack Clark,
+(arXiv:2402.08327). ArXiv:2402.08327 [cs]. Gretchen Krueger, and Ilya Sutskever. 2021. Learn-
+ing transferable visual models from natural language
+Phillip Lippe, Nithin Holla, Shantanu Chandra, San-
+supervision. In Proceedings of the 38th International
+thosh Rajamanickam, Georgios Antoniou, Ekaterina
+Conference on Machine Learning, page 8748–8763.
+Shutova, and Helen Yannakoudakis. 2020. A multi-
+PMLR.
+modal framework for the detection of hateful memes.
+(arXiv:2012.12871). ArXiv:2012.12871 [cs]. Shaoqing Ren, Kaiming He, Ross Girshick, and Jian
+Sun. 2015. Faster r-cnn: Towards real-time object
+Chen Liu, Gregor Geigle, Robin Krebs, and Iryna
+detection with region proposal networks. In Ad-
+Gurevych. 2022. Figmemes: A dataset for figura-
+vances in Neural Information Processing Systems,
+tive language identification in politically-opinionated
+volume 28. Curran Associates, Inc.
+memes. In Proceedings of the 2022 Conference on
+Empirical Methods in Natural Language Processing,
+Stephen Robertson and Hugo Zaragoza. 2009. The
+page 7069–7086, Abu Dhabi, United Arab Emirates.
+probabilistic relevance framework: Bm25 and be-
+Association for Computational Linguistics.
+yond. Foundations and Trends in Information Re-
+trieval, 3:333–389.
+Haotian Liu, Chunyuan Li, Qingyang Wu, and
+Yong Jae Lee. 2023. Visual instruction tuning.
+Umitcan Sahin, Izzet Emre Kucukkaya, Oguzhan Ozce-
+(arXiv:2304.08485). ArXiv:2304.08485 [cs].
+lik, and Cagri Toraman. 2023. Arc-nlp at mul-
+Wairimu Nderitu. 2020. United nations strategy and timodal hate speech event detection 2023: Multi-
+plan of action on hate speech. modal methods boosted by ensemble learning, syn-
+tactical and entity features. (arXiv:2307.13829).
+Thanh-Do Nguyen, Chi Minh Bui, Thi-Hai-Yen Vuong, ArXiv:2307.13829 [cs].
+and Xuan-Hieu Phan. 2023. Passage-based bm25
+hard negatives: A simple and effective negative sam- Keshav Santhanam, Omar Khattab, Jon Saad-Falcon,
+pling strategy for dense retrieval. In Proceedings of Christopher Potts, and Matei Zaharia. 2022. Col-
+the 37th Pacific Asia Conference on Language, Infor- bertv2: Effective and efficient retrieval via
+mation and Computation, page 591–599, Hong Kong, lightweight late interaction. In Proceedings of the
+China. Association for Computational Linguistics. 2022 Conference of the North American Chapter of
+5344
+
+--- Page 13 ---
+the Association for Computational Linguistics: Hu- Quentin Lhoest, and Alexander M. Rush. 2019. Hug-
+man Language Technologies, page 3715–3734, Seat- gingface’s transformers: State-of-the-art natural lan-
+tle, United States. Association for Computational guage processing.
+Linguistics.
+John Woodhouse. 2022. Regulating online harms - uk
+Florian Schroff, Dmitry Kalenichenko, and James parliament. UK Parliament.
+Philbin. 2015. Facenet: A unified embedding for
+Wen-tau Yih, Kristina Toutanova, John C. Platt, and
+face recognition and clustering. In 2015 IEEE Con-
+Christopher Meek. 2011. Learning discriminative
+ference on Computer Vision and Pattern Recognition
+projections for text similarity measures. In Proceed-
+(CVPR), page 815–823. ArXiv:1503.03832 [cs].
+ings of the Fifteenth Conference on Computational
+Christoph Schuhmann, Romain Beaumont, Richard Natural Language Learning, page 247–256, Portland,
+Vencu, Cade W Gordon, Ross Wightman, Mehdi Oregon, USA. Association for Computational Lin-
+Cherti, Theo Coombes, Aarush Katta, Clayton guistics.
+Mullis, Mitchell Wortsman, Patrick Schramowski,
+Fei Yu, Jiji Tang, Weichong Yin, Yu Sun, Hao Tian,
+Srivatsa R Kundurthy, Katherine Crowson, Lud-
+Hua Wu, and Haifeng Wang. 2021. Ernie-vil:
+wig Schmidt, Robert Kaczmarczyk, and Jenia Jitsev.
+Knowledge enhanced vision-language representa-
+2022. LAION-5b: An open large-scale dataset for
+tions through scene graph. (arXiv:2006.16934).
+training next generation image-text models. In Thirty-
+ArXiv:2006.16934 [cs].
+sixth Conference on Neural Information Processing
+Systems Datasets and Benchmarks Track. Pengchuan Zhang, Xiujun Li, Xiaowei Hu, Jianwei
+Yang, Lei Zhang, Lijuan Wang, Yejin Choi, and Jian-
+Chhavi Sharma, Deepesh Bhageria, William Scott,
+feng Gao. 2021. Vinvl: Revisiting visual representa-
+Srinivas PYKL, Amitava Das, Tanmoy Chakraborty,
+tions in vision-language models. page 5579–5588.
+Viswanath Pulabaigari, and Björn Gambäck. 2020.
+Semeval-2020 task 8: Memotion analysis- the visuo-
+lingual metaphor! In Proceedings of the Four- A Experiment Setup
+teenth Workshop on Semantic Evaluation, page
+759–773, Barcelona (online). International Commit- A work station equipped with NVIDIA RTX
+tee for Computational Linguistics. 3090 and AMD 5900X was used for the exper-
+iments. PyTorch 2.0.1, CUDA 11.8, and
+Hyun Oh Song, Yu Xiang, Stefanie Jegelka, and Silvio
+Savarese. 2016. Deep metric learning via lifted struc- Python 3.10.12 were used for implementing
+tured feature embedding. In 2016 IEEE Conference the experiments. HuggingFace transformer li-
+on Computer Vision and Pattern Recognition (CVPR), brary (Wolf et al., 2019) was used for implement-
+page 4004–4012, Las Vegas, NV, USA. IEEE.
+ing the pretrained CLIP encoder (Radford et al.,
+Yumin Suh, Bohyung Han, Wonsik Kim, and Ky- 2021). Faiss (Johnson et al., 2019) vector similarity
+oung Mu Lee. 2019. Stochastic class-based hard search library with version faiss-gpu 1.7.2
+example mining for deep metric learning. page
+was used to perform dense retrieval. Sparse re-
+7251–7259.
+trieval was performed with rank-bm25 0.2.2
+Shardul Suryawanshi, Bharathi Raja Chakravarthi, Mi- 6. All the reported metrics were computed by
+hael Arcan, and Paul Buitelaar. 2020a. Multimodal TorchMetrics 1.0.1. For LLaVA (Liu et al.,
+meme dataset (multioff) for identifying offensive con-
+2023), we fine-tuned the model on a system with
+tent in image and text. In Proceedings of the Second
+4 A100-80GB. The runtime was 4 hours on the
+Workshop on Trolling, Aggression and Cyberbullying,
+page 32–41, Marseille, France. European Language HatefulMemes and 3 hours on the HarMeme. The
+Resources Association (ELRA). details for fine-tuniung is covered in Appendix E.
+All the metrics were reported based on the mean
+Shardul Suryawanshi, Bharathi Raja Chakravarthi,
+Pranav Verma, Mihael Arcan, John Philip McCrae, of three runs with different seeds. Due to the lim-
+and Paul Buitelaar. 2020b. A dataset for troll classi- ited space in Table 1, we provide more details for
+fication of tamilmemes. In Proceedings of the WIL- our main results here. HateCLIPper with RGCL
+DRE5– 5th Workshop on Indian Language Data:
+obtained an accuracy of 78.77 0.25 and an AUC
+Resources and Evaluation, page 7–13, Marseille, ±
+of 86.95 0.21 on HatefulMemes.
+France. European Language Resources Association
+±
+(ELRA).
+B Hyperparameter
+Thomas Wolf, Lysandre Debut, Victor Sanh, Julien
+Chaumond, Clement Delangue, Anthony Moi, Pier- The default hyperparameter for all the models are
+ric Cistac, Tim Rault, Rémi Louf, Morgan Funtow- shown in Table 9. The modelling hyperparame-
+icz, Joe Davison, Sam Shleifer, Patrick von Platen,
+ter is based on HateCLIPper’s setting (Kumar and
+Clara Ma, Yacine Jernite, Julien Plu, Canwen Xu,
+Teven Le Scao, Sylvain Gugger, Mariama Drame, 6https://github.com/dorianbrown/rank_bm25
+5345
+
+--- Page 14 ---
+Nandakumar, 2022) for a fair comparison. For vi- ward layers incorporating activation functions and
+sion and language modality fusion, we perform dropout layers. These layers are applied to the
+element-wise product between the vision embed- image and text representation f and f to obtain
+I′ T′
+dings and language embeddings. This is known the final embedding vector g . The number of Pre-
+i
+as align-fusion in HateCLIPper (Kumar and Nan- Output layers is a hyperparameter to tune. We
+dakumar, 2022). The hyperparameters associated shorthand this process of obtaining the joint em-
+with retrieval-guided contrastive learning are man- bedding vector with ( , ) for simplification as
+F · ·
+ually tuned with respect to the evaluation metric denoted in Eq. 1.
+on the development set. With this configuration of
+hyperparameter, the number of trainable parame- D Dataset details and statistics
+ters is about 5 million and training takes around 30
+Table 10 shows the data split for the HatefulMemes
+minutes.
+and HarMeme datasets. Note that HarMeme is
+Table 9: Default hyperparameter values for the first introduced in Pramanick et al. 2021a, how-
+modelling and Retrieval-Guided Contrastive Learning ever, in Pramanick et al. 2021b, HarMeme had
+(RGCL) been renamed to Harm-C. Following the notation
+of previous works (Cao et al., 2022), we use its
+Modelling hyperparameter Value
+original name HarMeme in this paper. The memes
+Image size 336 in HarMeme are labeled with three classes: very
+Pretrained CLIP model ViT-L-Patch/14
+harmful, partially harmful, and harmless. Follow-
+Projection dimension of MLP 1024
+Number of layers in the MLP 3 ing previous work (Cao et al., 2022; Pramanick
+Optimizer AdamW
+et al., 2021b), we combine the very harmful and
+Maximum epochs 30
+partially harmful memes into hateful memes and
+Batch size 64
+Learning rate 0.0001 regard harmless memes as benign memes.
+Weight decay 0.0001
+Gradient clip value 0.1
+Table 10: Statistical summary of HatefulMemes and
+Modality fusion Element-wise product
+HarMeme datasets
+RGCL hyperparameter Value
+# hard negative examples 1 Datasets Train Test
+# pseudo-gold positive examples 1 #Benign #Hate #Benign #Hate
+Similarity metric Cosine similarity
+HatefulMemes 5450 3050 500 500
+Loss function NLL
+Top-K for retrieval based inference 10 HarMeme 1949 1064 230 124
+In addition to hateful memes classification, we
+C HateCLIPper’s Architecture also evaluate the MultiOFF, Harm-P and Memo-
+For the ith image and text pair (I , T ), HateCLIP- tion7K datasets. Table 11 shows the dataset statis-
+i i
+per obtains the feature embeddings f and f 7 tics.
+I T
+with the pretrained CLIP vision and language en-
+Table 11: Statistical summary of MultiOFF, Harm-P
+coders. To facilitate the learning of task-specific and Memotion7K datasets. Neg. for Negative, Pos. for
+features, distinct trainable projection layers are em- Positive.
+ployed after the extracted feature vectors to obtain
+projected features f and f . f and f are vectors Datasets Train Test
+I′ T′ I′ T′
+#Neg. #Pos. #Neg. #Pos.
+of dimension n, which is a hyperparameter to tune.
+These trainable projection layers consist of a feed- MultiOFF(Offensive) 258 187 58 91
+forward layer followed by a dropout layer. These Harm-P(Harmful) 1534 1486 182 173
+feature vectors undergo explicit cross-modal inter- Memotion7K
+action via Hadamard product i.e., element-wise -Humour 1651 5342 445 1433
+-Sarcasm 1544 5449 421 1457
+multiplication. This fusion process is referred to
+-Offensive 2713 4280 707 1171
+"align-fusion" within the HateCLIPper framework. -Motivation 4526 2467 1188 690
+After the align-fusion, a series of Pre-Output lay-
+ers are employed, comprising multiple feedfor-
+To access the Facebook HatefulMemes
+7Dropped subscript i for simplicity dataset, one must follow the license from Face-
+5346
+
+--- Page 15 ---
+book8.HarMeme and Harm-P is distributed for with a negative example for an anchor meme. Our
+research purpose only, without a license for results in Table 13 suggest that using triplet loss
+commercial use. MultiOFF is licensed under performs comparably to the default NLL loss.
+CC-BY-NC. Memotion7K has no specific license
+Table 13: Ablation study on the loss function and simi-
+mentioned.
+larity metrics on the HatefulMemes dataset. Similarity
+metrics include cosine similarity, inner product and neg-
+E LLaVA experiments
+ative squared L2.
+For fine-tuning LLaVA (Liu et al., 2023), we fol-
+low the original hyperparameters setting9 for fine- Loss Similarity AUC Acc.
+tuning on downstream tasks. For the prompt for- Cosine 87.0 78.8
+mat, we follow InstructBLIP (Dai et al., 2023). For NLL Inner Product 86.1 78.2
+L2 85.7 76.6
+computing the AUC and accuracy metrics, we also
+Cosine 86.7 78.7
+follow InstructBLIP’s procedure.
+Triplet Inner Product 86.1 78.2
+L2 85.7 76.8
+F Ablation study on numbers of retrieved
+examples
+H Sparse retrieval
+We experiment with using more than one hard neg-
+ative and pseudo-gold positive gold examples in
+We use VinVL object detector (Zhang et al., 2021)
+training.
+to obtain the region-of-interest object prediction
+The inclusion of more than one example for both
+and its corresponding attributes.
+types of examples causes the performance to de-
+After obtaining these text-based image features,
+grade. This phenomenon aligns with recent find-
+we concatenate these text with the overlaid caption
+ings in the literature, as Karpukhin et al. (2020)
+from the meme to perform the sparse retrieval. We
+reported that the incorporation of multiple hard
+use BM-25 (Robertson and Zaragoza, 2009) to per-
+negative examples does not necessarily enhance
+form sparse retrieval. For variable number of object
+performance in passage retrieval.
+predictions, we set a region-of-interest bounding
+box detection threshold of 0.2, a minimum of 10
+Table 12: Ablation study on omitting and using two
+bounding boxes, and a maximum of 100 bounding
+Hard negative and/or Pseudo-Gold positive examples
+on the HatefulMemes boxes, consistent with the default settings of the
+VinVL.
+Model AUC Acc.
+Baseline RGCL 87.0 78.8
+w/ 2 Hard negative 85.9 77.3
+w/ 4 Hard negative 85.7 76.0
+w/ 2 Pseudo-Gold positive 86.6 78.5
+w/ 4 Pseudo-Gold positive 86.3 77.4
+G Ablation study on loss function and
+similarity metrics
+Inner product (IP) and Euclidean L2 distance are
+also commonly used as similarity measures. Since
+Euclidean distance (L2) is a distance metric, we
+take its negative to serve as a measure of similarity.
+We tested these alternatives and found cosine simi-
+larity performs slightly better as shown in Table 13.
+Additionally, another popular loss function for
+ranking is triplet loss (Chechik et al., 2009; Schroff
+et al., 2015) which compares a positive example
+8https://hatefulmemeschallenge.com/#download
+9https://github.com/haotian-liu/LLaVA
+5347

@@ -1,0 +1,1402 @@
+{
+  "paragraphs": [
+    {
+      "index": 0,
+      "style": "124",
+      "text": "面向多模态仇恨 Meme 检测的解释引导反事实对比学习方法∗"
+    },
+    {
+      "index": 1,
+      "style": "56",
+      "text": "Insert Subtitle Here"
+    },
+    {
+      "index": 3,
+      "style": "149",
+      "text": "FirstName Surname† Department Name Institution/University Name City State Country email@email.com"
+    },
+    {
+      "index": 4,
+      "style": "149",
+      "text": "FirstName Surname Department Name Institution/University Name City State Country email@email.com"
+    },
+    {
+      "index": 5,
+      "style": "149",
+      "text": "FirstName Surname Department Name Institution/University Name City State Country email@email.com"
+    },
+    {
+      "index": 9,
+      "style": "136",
+      "text": "ABSTRACT"
+    },
+    {
+      "index": 10,
+      "style": "69",
+      "text": "随着社交媒体平台的快速发展，图像与文本结合的 Meme 已成为网络信息传播的重要形式。其中，仇恨 Meme 通常通过图像内容、文本表达及二者之间的隐含关联传递歧视、侮辱或攻击性语义，对在线社区安全和内容治理带来挑战。现有多模态仇恨 Meme 检测方法多基于视觉语言预训练模型，通过图文特征融合或检索增强对比学习提升检测性能。然而，这类方法主要依赖图像和文本的显式表征，对隐式仇恨语义、混淆样本以及浅层图文相关性仍然较为敏感，难以保证模型真正依据关键语义证据进行判断。"
+    },
+    {
+      "index": 11,
+      "style": "69",
+      "text": "针对上述问题，本文提出一种解释引导反事实对比学习方法用于多模态仇恨 Meme 检测。该方法在图像和文本表征之外引入解释级语义信息，并通过上下文感知门控、FiLM 调制、语义残差和层级组合机制，将解释语义以受控方式注入图文联合表示中，以增强模型对隐式仇恨含义的理解能力。同时，本文设计归因引导的反事实学习模块，根据分类器权重和样本表示激活估计关键特征维度，并构造反事实表示约束模型对判别性证据的依赖，从而减少模型对虚假相关特征的利用。此外，针对传统对比学习中正样本定义过硬、伪正样本可能存在噪声的问题，本文进一步提出语义软正样本对比学习目标，根据解释语义相似度和检索置信度为正样本分配软权重，以学习更加细粒度的仇恨感知表示空间。"
+    },
+    {
+      "index": 12,
+      "style": "69",
+      "text": "本文在 HatefulMemes、HarMeme、MultiOFF 和 Harm-P 等多模态 Meme 数据集上进行实验，并与 CLIP、HateCLIPper、RGCL 等方法进行对比。实验结果表明，本文方法在多个评价指标上取得了稳定提升。进一步的消融实验和案例分析表明，解释引导融合、归因反事实约束和语义软正样本对比学习均能有效提升模型性能，尤其有助于改善模型在隐式仇恨和混淆样本上的判别能力。"
+    },
+    {
+      "index": 13,
+      "style": "118",
+      "text": "1 Introduce"
+    },
+    {
+      "index": 14,
+      "style": "69",
+      "text": "随着社交媒体的快速发展，网络空间中的仇恨内容呈现出规模化、隐蔽化和多模态化的传播趋势。仇恨 Meme 通常由图像和文字共同构成，是当前在线仇恨言论的重要表现形式之一。与纯文本仇恨言论不同，仇恨 Meme 往往通过图像、文字及二者之间的隐含关联表达针对特定群体或个体的贬损、歧视和攻击含义。这类内容不仅可能强化社会偏见、激化群体对立，还可能对现实世界中的歧视和暴力行为产生推动作用。因此，构建准确、高效的仇恨 Meme 自动检测方法，对于社交媒体内容治理和网络安全具有重要意义。"
+    },
+    {
+      "index": 16,
+      "style": "21",
+      "text": "图 1 左图毒性较隐性，右图则直接"
+    },
+    {
+      "index": 17,
+      "style": "69",
+      "text": "然而，准确检测仇恨 Meme 仍然具有较大挑战。已有研究指出，仇恨 Meme 检测中的一个突出困难是 confounder memes，即图像或文本存在细微差异，但整体语义和类别标签发生显著变化的样本。如图 1 所示，一个仇恨 Meme 可能与一个良性 Meme 共享相同文本，仅由于配图不同而表达完全不同的含义；也可能共享相同图像，仅由于文字变化而从仇恨表达转变为良性表达。这类样本与真实社交媒体中的 Meme 形式高度相似，因为 Meme 的仇恨性并不总是由某个单独模态决定，而是由图像和文字共同形成的隐含语义决定。即使是当前较强的 CLIP-based 检测系统，也可能对这类细粒度差异不够敏感，从而产生误判。"
+    },
+    {
+      "index": 18,
+      "style": "69",
+      "text": "我们认为，导致上述误判的一个重要原因是：现有多模态仇恨 Meme 检测方法主要依赖图像和文本的显式表征，而缺少对隐式仇恨语义和关键判别证据的进一步建模。对于 confounder memes 而言，样本之间往往在图像或文本层面具有较高相似性，因此它们在视觉语言表示空间中可能被映射到相近位置。然而，它们在真实语义上却可能具有完全不同的仇恨属性。仅依赖图像和文本显式特征，模型容易受到浅层图文相似性、数据集偏差或伪相关特征的影响，难以稳定地区分仇恨样本与良性混淆样本。此外，即使检索增强对比学习能够通过困难负样本改善表示空间，检索得到的伪正样本仍可能存在噪声，同标签样本之间也并不一定具有同等程度的语义相似性。"
+    },
+    {
+      "index": 19,
+      "style": "69",
+      "text": "为解决上述问题，本文提出一种解释引导反事实对比学习方法，用于学习更加鲁棒的多模态仇恨 Meme 表示。与仅依赖图像和文本显式特征的方法不同，本文引入解释级语义信息，以补充 Meme 中隐含的攻击对象、讽刺关系和仇恨意图。为了避免解释信息中的噪声直接干扰原始图文表示，本文设计了受控的解释引导融合模块，通过上下文感知门控、FiLM 调制、语义残差和层级组合机制，将解释语义选择性地注入图文联合表示中。该设计使模型能够在保留原始多模态表征的同时，进一步利用解释级语义增强对隐式仇恨内容的理解。"
+    },
+    {
+      "index": 20,
+      "style": "69",
+      "text": "进一步地，本文引入归因引导的反事实学习机制，以约束模型对关键证据的依赖。具体而言，我们根据分类器权重和样本表示激活值估计不同表示维度对当前预测的重要性，并对最重要的若干维度进行衰减，构造反事实表示。对于仇恨样本，如果模型确实依赖了有效的仇恨语义证据，则遮蔽关键维度后其仇恨预测置信度应当下降；对于良性样本，遮蔽关键维度不应导致模型异常提高仇恨预测概率。通过这种方式，模型在训练过程中被鼓励关注真正具有判别意义的语义证据，而不是依赖不稳定的浅层相关性。"
+    },
+    {
+      "index": 21,
+      "style": "69",
+      "text": "在表示学习方面，本文在检索增强对比学习的基础上进一步提出语义软正样本对比目标。不同于将所有同标签样本或检索伪正样本视为同等可靠的硬正样本策略，本文根据解释语义相似度和检索置信度为正样本分配软权重。对于批内同标签样本，模型根据其解释语义相似度确定其作为正样本的贡献；对于检索得到的伪正样本，模型根据检索分数对其进行加权。该策略能够降低伪正样本噪声对对比学习的影响，使模型学习到更加细粒度、更加仇恨感知的多模态表示空间。"
+    },
+    {
+      "index": 22,
+      "style": "69",
+      "text": "我们在 HatefulMemes、HarMeme、MultiOFF 和 Harm-P 等多个多模态 Meme 检测数据集上验证本文方法的有效性，并与 CLIP、HateCLIPper、RGCL 等代表性方法进行比较。实验结果表明，本文方法在多个数据集上均取得稳定提升。进一步的消融实验表明，解释引导融合、归因引导反事实学习和语义软正样本对比学习均对最终性能具有积极贡献。我们还通过混淆样本分析和反事实案例分析说明，本文方法能够更好地区分图像或文本高度相似但语义标签不同的 Meme 样本，从而提升模型对隐式仇恨语义的判别能力。"
+    },
+    {
+      "index": 23,
+      "style": "69",
+      "text": "本文的主要贡献如下："
+    },
+    {
+      "index": 24,
+      "style": "",
+      "text": "本文提出一种解释引导的多模态仇恨 Meme 检测框架。 该框架在图像和文本显式表征之外引入解释级语义信息，并通过上下文感知门控、FiLM 调制、语义残差和层级组合机制进行受控融合，从而增强模型对隐式仇恨语义的理解能力。"
+    },
+    {
+      "index": 25,
+      "style": "",
+      "text": "本文提出一种归因引导的反事实学习机制。 该机制通过估计表示维度的重要性并构造反事实表示，约束模型依赖真正具有判别意义的语义证据，有助于减少模型对浅层相关性和伪相关特征的依赖。"
+    },
+    {
+      "index": 26,
+      "style": "",
+      "text": "本文提出一种语义软正样本对比学习目标。 该目标根据解释语义相似度和检索置信度对正样本进行软加权，缓解传统硬正样本策略中的噪声问题，使模型能够学习更加细粒度的仇恨感知表示空间。"
+    },
+    {
+      "index": 27,
+      "style": "",
+      "text": "本文在多个多模态 Meme 检测数据集上进行了实验验证。 实验结果、消融分析和混淆样本案例分析表明，本文方法能够有效提升仇恨 Meme 检测性能，尤其在隐式仇恨和 confounder memes 场景下具有更强的判别能力。"
+    },
+    {
+      "index": 28,
+      "style": "119",
+      "text": "3 Explanation-Aware Retrieval-Guided Learning Methodology"
+    },
+    {
+      "index": 29,
+      "style": "",
+      "text": "本文提出一种语义解释与反事实证据增强的检索引导对比学习框架，记为 SEC-RGCL。该框架在原始 RGCL 的图文联合表征与动态检索机制基础上，引入语义解释增强和反事实证据学习两个模块。"
+    },
+    {
+      "index": 30,
+      "style": "465",
+      "text": "原始 Retrieval-Guided Contrastive Learning（RGCL）通过动态检索 pseudo-gold positive 和 hard negative，在图文联合表征空间中拉近同类样本、拉远异类混淆样本，从而学习具有有害性判别能力的 hatefulness-aware embedding space。该机制在一定程度上缓解了 hateful meme 检测中常见的 confounder 问题，即图像相似或文本相似的样本可能由于跨模态组合关系不同而具有相反标签。然而，RGCL 的检索和对比学习仍主要依赖原始图像-文本编码器产生的隐式表征。当 meme 的关键含义来自隐喻表达、文化背景、中文网络用语、语用暗示或图文组合后的深层语义时，仅依赖原始图文特征可能不足以提供稳定的判别依据。"
+    },
+    {
+      "index": 31,
+      "style": "5",
+      "text": "为解决上述问题，本文提出一种基于语义解释增强与反事实证据学习的检索引导对比学习框架（Semantic Explanation and Counterfactual Evidence Enhanced RGCL，SEC-RGCL）。该框架在原始图文编码与检索式对比学习的基础上，引入由多模态大模型生成的中性语义解释句，将 Visual + OCR 共同表达的具体含义显式化，用于补充原始图文表征中难以捕获的高层语义信息。与此同时，本文在最终分类 embedding 上构造反事实扰动，通过削弱高贡献证据维度并约束预测变化，进一步促使模型依赖稳定且有效的判别证据，而不是依赖表层模式或数据偏置。整体而言，语义解释模块主要解决“模型能够获得何种语义补充”的问题，反事实证据学习模块则进一步约束“模型是否真正依赖这些有效证据”进行判断。"
+    },
+    {
+      "index": 32,
+      "style": "5",
+      "text": "本文方法创新点主要有：语义解释生成与编码、解释感知的投影与融合、反事实证据学习。下面分别介绍各个部分的具体设计。"
+    },
+    {
+      "index": 34,
+      "style": "21",
+      "text": "图 2 整体框架"
+    },
+    {
+      "index": 35,
+      "style": "69",
+      "text": "3.1 Semantic Explanation Generation and Encoding"
+    },
+    {
+      "index": 36,
+      "style": "465",
+      "text": "在有害 meme 检测任务中，大量有害或冒犯性语义并不直接体现在单一文本片段或视觉元素中，而是由图像和文字共同构成。例如，某些 meme 的 OCR 字面内容可能并不包含明显敏感词，但当其与特定人物、群体、符号、网络用语或文化背景结合时，可能产生较强的语义指向。由于传统图文编码器通常以隐式方式建模图像和文本之间的对齐关系，其表征可能难以充分捕获中文谐音、网络流行语、文化引用以及图文组合后的具体含义。因此，本文在图文特征融合之前引入语义解释生成步骤，用于为后续表示学习提供中性的高层语义补充。"
+    },
+    {
+      "index": 37,
+      "style": "5",
+      "text": "给定训练样本集合："
+    },
+    {
+      "index": 39,
+      "style": "465",
+      "text": "其中， 表示第  个 meme 的图像， 表示由 OCR 得到的图中文字， 表示其二分类标签。本文首先使用多模态大模型根据图像 、OCR 文本  以及语义解释提示词  生成语义解释 ："
+    },
+    {
+      "index": 41,
+      "style": "465",
+      "text": "本文中的  并非用于直接输出 harmful 或 non-harmful 的最终判断，而是被设计为一条用于 meme embedding 的中性英文语义解释句。该解释句的作用是概括 Visual + OCR 共同传达的具体含义，重点包含图像中的关键实体、OCR 文本的字面含义以及二者组合后的语义关系。在内容具有明确依据时，解释还可以包含中文网络用语、谐音、文化引用、符号、事件、群体以及结果等信息。与直接生成标签式解释不同，该设计能够降低标签泄露风险，并使解释信息更适合作为后续融合、检索和对比学习的语义补充。"
+    },
+    {
+      "index": 42,
+      "style": "5",
+      "text": "本文采用的语义解释提示词如表 1 所示。"
+    },
+    {
+      "index": 43,
+      "style": "5",
+      "text": "表 1 语义解释提示词"
+    },
+    {
+      "index": 44,
+      "style": "468",
+      "text": "Generate one neutral English semantic explanation sentence to supplement image-text representations for meme embedding.Given the meme image and OCR text, state the concrete meaning conveyed by the combination of Visual + OCR.Include relevant visual entities, OCR meaning, Chinese internet slang, puns, cultural references, symbols, events, groups, and outcomes only when they are clearly supported.If the implied meaning is unclear, describe only the literal visual content and literal OCR meaning.Do not output a harmful/harmless label or any moral judgment.Avoid words such as hateful, toxic, harmful, harmless, racist, offensive, discriminatory, or abusive.If a person, group, or social category is explicitly involved, describe it neutrally as being referenced, portrayed, compared, or associated, rather than attacked or targeted.Use one English sentence only.OCR: {}"
+    },
+    {
+      "index": 45,
+      "style": "465",
+      "text": "该提示词具有两个方面的作用。首先，它要求大模型以一句中性英文语义句概括图像和 OCR 共同传达的具体含义，从而将隐式的跨模态语义转化为可编码的文本信息。其次，它明确禁止模型输出有害/无害标签、道德判断以及过度推测性的意图描述，使生成内容不直接替代分类器的判别过程，而仅作为原始图文表征的补充信号。当 meme 的隐含含义较为明确时，解释句可以提供关于中文网络用语、文化引用和图文组合语义的额外信息；当隐含含义不明确时，解释仅保留图像和 OCR 的字面描述，以避免引入无依据的噪声。"
+    },
+    {
+      "index": 46,
+      "style": "465",
+      "text": "生成语义解释后，本文进一步采用文本编码器将解释句转化为向量表示："
+    },
+    {
+      "index": 48,
+      "style": "465",
+      "text": "其中， 表示解释文本编码器， 表示语义解释特征。该特征将在后续模块中与图像特征和 OCR 文本特征进行融合。通过这种方式，模型不仅能够利用原始图文编码器捕获视觉与文字之间的基础对齐关系，还能够利用解释句显式补充原始编码器难以表达的高层语义信息。"
+    },
+    {
+      "index": 49,
+      "style": "4",
+      "text": "3.2. Explanation-Aware Projection and Fusion"
+    },
+    {
+      "index": 50,
+      "style": "465",
+      "text": "在获得图像、OCR 文本和语义解释三路信息后，需要将不同来源的特征映射到统一表示空间。本文分别使用图像编码器、文本编码器和解释编码器提取三种模态的初始特征："
+    },
+    {
+      "index": 52,
+      "style": "465",
+      "text": "其中，、 和  分别表示图像特征、OCR 文本特征和语义解释特征。由于三类特征的来源和分布不同，本文进一步通过投影层将其映射到相同维度的隐空间："
+    },
+    {
+      "index": 56,
+      "style": "465",
+      "text": "对于原始图像和 OCR 文本，本文沿用 RGCL/RAC 中常用的 align-fusion 思路，通过逐维相乘显式建模图像与文本之间的对齐关系："
+    },
+    {
+      "index": 58,
+      "style": "465",
+      "text": "其中， 表示逐元素乘法， 表示基础图文融合表示。该表示保留了原始图像与 OCR 文本之间的跨模态对应关系，但其语义仍主要来源于编码器内部的隐式表征。"
+    },
+    {
+      "index": 59,
+      "style": "465",
+      "text": "为有效利用语义解释信息，本文并不直接将  与  进行简单拼接。直接拼接可能导致解释特征中的冗余信息或噪声被无差别地引入模型，进而影响表征的稳定性。因此，本文设计解释门控机制，根据当前图文表示动态控制解释信息的注入强度："
+    },
+    {
+      "index": 62,
+      "style": "465",
+      "text": "其中， 表示 Sigmoid 函数， 表示解释信息在不同维度上的门控权重， 表示经门控调节后的解释特征。该机制使模型能够根据样本内容自适应地选择解释信息中对当前图文语义更有用的部分。"
+    },
+    {
+      "index": 63,
+      "style": "465",
+      "text": "进一步地，本文采用 FiLM 调制方式利用解释特征对图文融合表示进行条件校准。具体而言，解释特征被用于生成缩放因子和偏置项："
+    },
+    {
+      "index": 66,
+      "style": "465",
+      "text": "随后，图文融合表示被调制为："
+    },
+    {
+      "index": 68,
+      "style": "465",
+      "text": "最后，本文通过语义残差连接得到最终的语义增强表示："
+    },
+    {
+      "index": 70,
+      "style": "465",
+      "text": "并将其输入多层感知机 ，获得用于分类和检索的最终 embedding："
+    },
+    {
+      "index": 72,
+      "style": "465",
+      "text": "通过上述设计，解释信息并非作为独立判断依据直接替代原始图文特征，而是在统一隐空间中对图文表示进行补充和校准。这样既保留了图像与 OCR 文本的原始跨模态证据，又引入了关于图文组合含义、网络用语和文化引用的高层语义信息。"
+    },
+    {
+      "index": 73,
+      "style": "4",
+      "text": "3.3. Retrieval-Guided Contrastive Learning"
+    },
+    {
+      "index": 74,
+      "style": "465",
+      "text": "在多模态有害 meme 检测中，许多样本之间存在明显的 confounder 关系，即图像或文字在表层上高度相似，但由于图文组合方式不同而具有不同标签。原始 RGCL 通过动态检索 pseudo-gold positive 和 hard negative 来优化表征空间，使同类样本更加接近，同时拉远语义相近但标签相反的困难样本。本文在此基础上使用语义增强后的 embedding  构建检索空间，使检索过程不仅依赖表层图文相似性，还能够利用解释句中包含的图文组合语义、文化引用和网络用语信息。"
+    },
+    {
+      "index": 75,
+      "style": "465",
+      "text": "具体而言，本文将训练集中所有样本的语义增强 embedding 存入检索数据库："
+    },
+    {
+      "index": 77,
+      "style": "465",
+      "text": "对于第  个训练样本，模型首先在检索数据库中寻找与其标签相同且相似度最高的样本作为 pseudo-gold positive，其 embedding 记为 。同时，模型检索与当前样本标签不同但相似度最高的样本作为 hard negative，其 embedding 记为 。当前 batch 中标签与样本  不同的样本被作为 in-batch negative："
+    },
+    {
+      "index": 79,
+      "style": "465",
+      "text": "最终，第  个样本的负样本集合定义为："
+    },
+    {
+      "index": 81,
+      "style": "465",
+      "text": "本文采用余弦相似度作为相似度函数："
+    },
+    {
+      "index": 83,
+      "style": "465",
+      "text": "为简化表示，定义："
+    },
+    {
+      "index": 85,
+      "style": "465",
+      "text": "检索引导对比损失定义为："
+    },
+    {
+      "index": 87,
+      "style": "465",
+      "text": "其中， 表示同标签样本中相似度最高的检索样本， 表示异标签样本中相似度最高的检索样本， 表示温度系数。与仅基于原始图文 embedding 的检索方式相比，语义增强后的检索空间能够更好地刻画样本之间的深层语义关系。因此，pseudo-gold positive 更可能表示具有相近语义依据的同类样本，而 hard negative 则更可能表示表面相似但语义判别依据不同的真正困难样本。由此，对比学习所执行的拉近和拉远过程不再仅依赖图像或文字的表层相似性，而是建立在更充分的语义补充之上。"
+    },
+    {
+      "index": 88,
+      "style": "4",
+      "text": "3.4. Counterfactual Evidence Learning"
+    },
+    {
+      "index": 89,
+      "style": "465",
+      "text": "虽然语义解释增强能够为模型提供额外的高层语义信息，检索引导对比学习也能够优化 embedding 空间的类间结构，但这仍不能保证模型在分类时真正依赖稳定且有效的判别证据。模型仍可能基于局部高频词、视觉 shortcut 或训练数据中的偶然相关模式完成预测。为缓解这一问题，本文进一步提出反事实证据学习模块，在最终分类 embedding 上构造证据削弱后的反事实表示，并约束原始预测与反事实预测之间的关系。"
+    },
+    {
+      "index": 90,
+      "style": "465",
+      "text": "设分类器对样本  的原始 embedding  输出 logits："
+    },
+    {
+      "index": 92,
+      "style": "465",
+      "text": "并通过 softmax 函数  得到预测概率："
+    },
+    {
+      "index": 94,
+      "style": "465",
+      "text": "为了确定哪些维度对 toxic 类别预测贡献较大，本文根据 embedding 激活值与分类头 toxic 类别权重计算维度重要性："
+    },
+    {
+      "index": 96,
+      "style": "465",
+      "text": "其中， 表示  的第  个维度， 表示分类头中 toxic 类别在第  个维度上的权重。随后选择贡献最高的 top- 维度作为关键证据维度集合："
+    },
+    {
+      "index": 98,
+      "style": "465",
+      "text": "基于该集合，本文构造反事实 mask："
+    },
+    {
+      "index": 100,
+      "style": "465",
+      "text": "其中， 表示削弱比例。反事实 embedding 定义为："
+    },
+    {
+      "index": 102,
+      "style": "465",
+      "text": "随后，使用同一分类头对反事实 embedding 进行预测："
+    },
+    {
+      "index": 105,
+      "style": "465",
+      "text": "对于有害样本，如果被削弱的维度确实承载了与 toxic 判断相关的关键证据，则削弱这些维度后，toxic logit 应出现下降。本文将该约束定义为："
+    },
+    {
+      "index": 107,
+      "style": "465",
+      "text": "对于无害样本，反事实扰动不应导致 toxic logit 异常升高，否则说明模型的判别边界可能过于敏感或不稳定。因此，本文进一步引入 benign 稳定性约束："
+    },
+    {
+      "index": 109,
+      "style": "465",
+      "text": "最终反事实损失为："
+    },
+    {
+      "index": 111,
+      "style": "465",
+      "text": "该模块的目的并非简单地进行特征扰动，而是在表示空间中构造关键证据被削弱的反事实情形。通过这种方式，模型被显式约束为：当有害样本的关键证据被削弱时，toxic 预测应相应下降；当无害样本受到同类扰动时，模型不应产生异常的 toxic 响应。该机制有助于提升模型决策依据的稳定性和可解释性。"
+    },
+    {
+      "index": 112,
+      "style": "4",
+      "text": "4. Experiment"
+    },
+    {
+      "index": 113,
+      "style": "69",
+      "text": "本章对所提出的语义解释与反事实证据增强检索引导对比学习框架（SEC-RGCL）进行实验评估。首先介绍实验数据、模型设置、评价指标及实现参数；随后比较 SEC-RGCL 与原始 RGCL 基线的整体性能，并通过模块消融分析语义解释增强与反事实证据学习的独立贡献；在此基础上，进一步考察语义解释信息相对于原始 OCR 文本的作用，以及反事实证据学习对模型决策响应的影响。"
+    },
+    {
+      "index": 114,
+      "style": "69",
+      "text": "4.1 实验设置"
+    },
+    {
+      "index": 115,
+      "style": "69",
+      "text": "4.1.1 数据集与任务"
+    },
+    {
+      "index": 116,
+      "style": "69",
+      "text": "本文所有实验均在 ToxiCN MM 数据集上进行。ToxiCN MM 是面向中文有害 meme 检测的大规模细粒度标注数据集，共包含 12,000 个样本。本文采用数据集的官方划分方式，将全部样本划分为训练集、验证集和测试集，所占比例分别为 80%、10% 和 10%，对应的样本数量分别为 9,600、1,200 和 1,200。"
+    },
+    {
+      "index": 117,
+      "style": "69",
+      "text": "本文主要研究中文有害 meme 的二分类任务，即判断输入 meme 是否包含有害内容。训练集用于模型参数优化，验证集用于训练过程中的模型选择，测试集用于评估模型的最终分类性能。所有模型均采用相同的数据划分，以保证实验结果的可比性。"
+    },
+    {
+      "index": 118,
+      "style": "69",
+      "text": "4.1.2 模型设置"
+    },
+    {
+      "index": 119,
+      "style": "69",
+      "text": "为分析不同组成部分对模型性能的影响，本文在原始 RGCL 基础上构建四种变体，并与完整 SEC-RGCL 进行比较。各模型的具体设置如表 4-1 所示。"
+    },
+    {
+      "index": 120,
+      "style": "69",
+      "text": "表 4-1 实验中使用的模型设置"
+    },
+    {
+      "index": 121,
+      "style": "69",
+      "text": "模型"
+    },
+    {
+      "index": 122,
+      "style": "69",
+      "text": "语义解释"
+    },
+    {
+      "index": 123,
+      "style": "69",
+      "text": "反事实学习"
+    },
+    {
+      "index": 124,
+      "style": "69",
+      "text": "设置说明"
+    },
+    {
+      "index": 125,
+      "style": "69",
+      "text": "Baseline"
+    },
+    {
+      "index": 126,
+      "style": "69",
+      "text": "—"
+    },
+    {
+      "index": 127,
+      "style": "69",
+      "text": "—"
+    },
+    {
+      "index": 128,
+      "style": "69",
+      "text": "原始 RGCL 基线模型"
+    },
+    {
+      "index": 129,
+      "style": "69",
+      "text": "Baseline + Exp"
+    },
+    {
+      "index": 130,
+      "style": "69",
+      "text": "√"
+    },
+    {
+      "index": 131,
+      "style": "69",
+      "text": "—"
+    },
+    {
+      "index": 132,
+      "style": "69",
+      "text": "加入语义解释生成、编码与融合模块"
+    },
+    {
+      "index": 133,
+      "style": "69",
+      "text": "Baseline + CF"
+    },
+    {
+      "index": 134,
+      "style": "69",
+      "text": "—"
+    },
+    {
+      "index": 135,
+      "style": "69",
+      "text": "√"
+    },
+    {
+      "index": 136,
+      "style": "69",
+      "text": "加入反事实证据学习模块"
+    },
+    {
+      "index": 137,
+      "style": "69",
+      "text": "Baseline + Text"
+    },
+    {
+      "index": 138,
+      "style": "69",
+      "text": "OCR 文本"
+    },
+    {
+      "index": 139,
+      "style": "69",
+      "text": "—"
+    },
+    {
+      "index": 140,
+      "style": "69",
+      "text": "以原始 OCR 文本替代语义解释输入"
+    },
+    {
+      "index": 141,
+      "style": "69",
+      "text": "SEC-RGCL"
+    },
+    {
+      "index": 142,
+      "style": "69",
+      "text": "√"
+    },
+    {
+      "index": 143,
+      "style": "69",
+      "text": "√"
+    },
+    {
+      "index": 144,
+      "style": "69",
+      "text": "完整模型"
+    },
+    {
+      "index": 145,
+      "style": "69",
+      "text": "4.2 评价指标"
+    },
+    {
+      "index": 146,
+      "style": "69",
+      "text": "本文采用准确率（Accuracy，Acc）和受试者工作特征曲线下面积（Area Under the Receiver Operating Characteristic Curve，AUC）评价模型性能。Accuracy 表示分类正确的样本占全部样本的比例，定义为："
+    },
+    {
+      "index": 147,
+      "style": "69",
+      "text": "Acc = (TP + TN) / (TP + TN + FP + FN)"
+    },
+    {
+      "index": 148,
+      "style": "69",
+      "text": "其中，TP、TN、FP 和 FN 分别表示真正例、真负例、假正例和假负例。AUC 衡量模型在不同分类阈值下区分有害与无害样本的能力，其数值越高，表明模型的整体排序与判别性能越好。"
+    },
+    {
+      "index": 149,
+      "style": "69",
+      "text": "4.3 参数设置"
+    },
+    {
+      "index": 150,
+      "style": "69",
+      "text": "为保证不同模型变体之间的公平比较，各模型采用一致的训练参数。所有实验均在单张 NVIDIA GeForce RTX 3090 GPU 上完成。"
+    },
+    {
+      "index": 151,
+      "style": "69",
+      "text": "考虑到不同模型结构在优化难度和收敛速度方面存在差异，其达到最优性能的训练轮次可能并不一致。因此，本文将所有模型的最大训练轮数统一设置为 50 个 epoch，以保证各模型获得充分且一致的训练预算。训练过程中，在每个 epoch 结束后于验证集上评估模型性能，并选取验证集表现最佳的 checkpoint 用于测试集评估，从而降低不同收敛进程对模型比较的影响。结果表中的 Best Epoch 表示验证集最优 checkpoint 所对应的训练轮次。"
+    },
+    {
+      "index": 154,
+      "style": "69",
+      "text": "【待补充：图像编码器、OCR 文本编码器、解释编码器、多模态大模型及版本、优化器、学习率、batch size、最大训练轮数、温度系数、损失权重、top-k、削弱比例、margin、随机种子、检索库更新频率和硬件环境。】"
+    },
+    {
+      "index": 155,
+      "style": "69",
+      "text": "4.4 与基线模型的性能比较"
+    },
+    {
+      "index": 156,
+      "style": "69",
+      "text": "表 4-2 给出了 SEC-RGCL 与原始 RGCL 基线模型的分类结果。SEC-RGCL 在 Acc 和 AUC 两项指标上均取得更高的性能。"
+    },
+    {
+      "index": 157,
+      "style": "69",
+      "text": "表 4-2 SEC-RGCL 与基线模型的性能比较"
+    },
+    {
+      "index": 158,
+      "style": "69",
+      "text": "模型"
+    },
+    {
+      "index": 159,
+      "style": "69",
+      "text": "Acc"
+    },
+    {
+      "index": 160,
+      "style": "69",
+      "text": "AUC"
+    },
+    {
+      "index": 161,
+      "style": "69",
+      "text": "Best Epoch"
+    },
+    {
+      "index": 162,
+      "style": "69",
+      "text": "Baseline"
+    },
+    {
+      "index": 163,
+      "style": "69",
+      "text": "0.8117"
+    },
+    {
+      "index": 164,
+      "style": "69",
+      "text": "0.8351"
+    },
+    {
+      "index": 165,
+      "style": "69",
+      "text": "21"
+    },
+    {
+      "index": 166,
+      "style": "69",
+      "text": "SEC-RGCL"
+    },
+    {
+      "index": 167,
+      "style": "69",
+      "text": "0.8392"
+    },
+    {
+      "index": 168,
+      "style": "69",
+      "text": "0.8622"
+    },
+    {
+      "index": 169,
+      "style": "69",
+      "text": "24"
+    },
+    {
+      "index": 170,
+      "style": "69",
+      "text": "与 Baseline 相比，SEC-RGCL 的 Acc 由 0.8117 提升至 0.8392，提高 2.75 个百分点；AUC 由 0.8351 提升至 0.8622，提高 2.71 个百分点。两项指标上的一致增益表明，在原始 RGCL 框架中同时引入语义解释增强与反事实证据学习，能够改善中文有害 meme 的分类性能。"
+    },
+    {
+      "index": 171,
+      "style": "69",
+      "text": "4.5 模块消融实验"
+    },
+    {
+      "index": 172,
+      "style": "69",
+      "text": "为评估语义解释增强模块和反事实证据学习模块的独立贡献，本文分别在 Baseline 上加入 Exp 和 CF，并与完整 SEC-RGCL 进行比较。实验结果如表 4-3 所示。"
+    },
+    {
+      "index": 173,
+      "style": "69",
+      "text": "表 4-3 SEC-RGCL 的模块消融结果"
+    },
+    {
+      "index": 174,
+      "style": "69",
+      "text": "模型"
+    },
+    {
+      "index": 175,
+      "style": "69",
+      "text": "Exp"
+    },
+    {
+      "index": 176,
+      "style": "69",
+      "text": "CF"
+    },
+    {
+      "index": 177,
+      "style": "69",
+      "text": "Acc"
+    },
+    {
+      "index": 178,
+      "style": "69",
+      "text": "AUC"
+    },
+    {
+      "index": 179,
+      "style": "69",
+      "text": "Best Epoch"
+    },
+    {
+      "index": 180,
+      "style": "69",
+      "text": "Baseline"
+    },
+    {
+      "index": 181,
+      "style": "69",
+      "text": "×"
+    },
+    {
+      "index": 182,
+      "style": "69",
+      "text": "×"
+    },
+    {
+      "index": 183,
+      "style": "69",
+      "text": "0.8117"
+    },
+    {
+      "index": 184,
+      "style": "69",
+      "text": "0.8351"
+    },
+    {
+      "index": 185,
+      "style": "69",
+      "text": "21"
+    },
+    {
+      "index": 186,
+      "style": "69",
+      "text": "Baseline + Exp"
+    },
+    {
+      "index": 187,
+      "style": "69",
+      "text": "√"
+    },
+    {
+      "index": 188,
+      "style": "69",
+      "text": "×"
+    },
+    {
+      "index": 189,
+      "style": "69",
+      "text": "0.8275"
+    },
+    {
+      "index": 190,
+      "style": "69",
+      "text": "0.8526"
+    },
+    {
+      "index": 191,
+      "style": "69",
+      "text": "33"
+    },
+    {
+      "index": 192,
+      "style": "69",
+      "text": "Baseline + CF"
+    },
+    {
+      "index": 193,
+      "style": "69",
+      "text": "×"
+    },
+    {
+      "index": 194,
+      "style": "69",
+      "text": "√"
+    },
+    {
+      "index": 195,
+      "style": "69",
+      "text": "0.8175"
+    },
+    {
+      "index": 196,
+      "style": "69",
+      "text": "0.8416"
+    },
+    {
+      "index": 197,
+      "style": "69",
+      "text": "20"
+    },
+    {
+      "index": 198,
+      "style": "69",
+      "text": "SEC-RGCL"
+    },
+    {
+      "index": 199,
+      "style": "69",
+      "text": "√"
+    },
+    {
+      "index": 200,
+      "style": "69",
+      "text": "√"
+    },
+    {
+      "index": 201,
+      "style": "69",
+      "text": "0.8392"
+    },
+    {
+      "index": 202,
+      "style": "69",
+      "text": "0.8622"
+    },
+    {
+      "index": 203,
+      "style": "69",
+      "text": "24"
+    },
+    {
+      "index": 204,
+      "style": "69",
+      "text": "加入语义解释模块后，Baseline + Exp 的 Acc 和 AUC 分别达到 0.8275 和 0.8526，较 Baseline 提高 1.58 和 1.75 个百分点。该结果说明，语义解释作为附加输入能够为原始图文表示提供有效补充，其作用与本文利用显式语义信息增强多模态表示的设计目标一致。"
+    },
+    {
+      "index": 205,
+      "style": "69",
+      "text": "加入反事实证据学习后，Baseline + CF 的 Acc 为 0.8175，AUC 为 0.8416，较 Baseline 分别提高 0.58 和 0.65 个百分点。尽管单独使用 CF 所带来的增益小于 Exp，两个指标仍保持一致提升，表明反事实约束能够对分类模型产生正向作用。"
+    },
+    {
+      "index": 206,
+      "style": "69",
+      "text": "完整 SEC-RGCL 在两项指标上均取得最优结果。相较于 Baseline + Exp，SEC-RGCL 的 Acc 和 AUC 进一步提高 1.17 和 0.96 个百分点；相较于 Baseline + CF，分别提高 2.17 和 2.06 个百分点。上述结果表明，语义解释增强与反事实证据学习具有互补性：前者扩展模型可利用的语义信息，后者约束模型对判别证据的响应，二者联合使用能够获得更好的分类效果。"
+    },
+    {
+      "index": 207,
+      "style": "69",
+      "text": "4.6 语义解释信息作用分析"
+    },
+    {
+      "index": 208,
+      "style": "69",
+      "text": "为进一步分析语义解释带来的增益是否来源于解释内容本身，本文将 Exp 分支中的大模型语义解释替换为原始 OCR 文本，构建 Baseline + Text。该变体保留额外文本编码与融合路径，因此可以在控制网络分支基本一致的条件下，比较原始文本与语义解释作为辅助输入时的性能差异。结果如表 4-4 所示。"
+    },
+    {
+      "index": 209,
+      "style": "69",
+      "text": "表 4-4 不同辅助文本输入的性能比较"
+    },
+    {
+      "index": 210,
+      "style": "69",
+      "text": "模型"
+    },
+    {
+      "index": 211,
+      "style": "69",
+      "text": "辅助文本输入"
+    },
+    {
+      "index": 212,
+      "style": "69",
+      "text": "Acc"
+    },
+    {
+      "index": 213,
+      "style": "69",
+      "text": "AUC"
+    },
+    {
+      "index": 214,
+      "style": "69",
+      "text": "Best Epoch"
+    },
+    {
+      "index": 215,
+      "style": "69",
+      "text": "Baseline"
+    },
+    {
+      "index": 216,
+      "style": "69",
+      "text": "无"
+    },
+    {
+      "index": 217,
+      "style": "69",
+      "text": "0.8117"
+    },
+    {
+      "index": 218,
+      "style": "69",
+      "text": "0.8351"
+    },
+    {
+      "index": 219,
+      "style": "69",
+      "text": "21"
+    },
+    {
+      "index": 220,
+      "style": "69",
+      "text": "Baseline + Text"
+    },
+    {
+      "index": 221,
+      "style": "69",
+      "text": "原始 OCR 文本"
+    },
+    {
+      "index": 222,
+      "style": "69",
+      "text": "0.8217"
+    },
+    {
+      "index": 223,
+      "style": "69",
+      "text": "0.8445"
+    },
+    {
+      "index": 224,
+      "style": "69",
+      "text": "35"
+    },
+    {
+      "index": 225,
+      "style": "69",
+      "text": "Baseline + Exp"
+    },
+    {
+      "index": 226,
+      "style": "69",
+      "text": "MLLM 语义解释"
+    },
+    {
+      "index": 227,
+      "style": "69",
+      "text": "0.8275"
+    },
+    {
+      "index": 228,
+      "style": "69",
+      "text": "0.8526"
+    },
+    {
+      "index": 229,
+      "style": "69",
+      "text": "33"
+    },
+    {
+      "index": 230,
+      "style": "69",
+      "text": "Baseline + Text 的 Acc 和 AUC 分别为 0.8217 和 0.8445，较 Baseline 提高 1.00 和 0.94 个百分点，表明增加辅助文本分支能够带来一定性能增益。使用大模型语义解释后，Baseline + Exp 的 Acc 和 AUC 进一步达到 0.8275 和 0.8526，分别高于 Baseline + Text 0.58 和 0.81 个百分点。"
+    },
+    {
+      "index": 231,
+      "style": "69",
+      "text": "由于 Baseline + Text 与 Baseline + Exp 均保留额外文本编码和融合路径，二者之间的性能差异主要反映辅助文本内容的作用。相较于重复输入原始 OCR 文本，语义解释对图像与文字共同表达的含义进行概括，并补充原始文本中未被显式表达的语义关系，因此能够为分类模型提供更有效的辅助信息。该实验评价的是语义解释作为模型输入的贡献，不涉及对解释文本生成质量的独立评估。"
+    },
+    {
+      "index": 232,
+      "style": "69",
+      "text": "4.7 反事实证据机制分析"
+    },
+    {
+      "index": 233,
+      "style": "69",
+      "text": "消融实验表明 CF 模块能够改善分类性能。为考察该模块是否改变模型对内部判别证据的响应，本文进一步分析关键特征维度被削弱前后的有害类别置信度变化。对于每个有害样本，首先提取分类前的最终 embedding，并根据特征激活幅度与有害类别分类权重幅度的乘积计算第 j 个维度的重要性："
+    },
+    {
+      "index": 234,
+      "style": "69",
+      "text": "sⱼ = |gⱼ| × |wⱼᵗᵒˣ|"
+    },
+    {
+      "index": 235,
+      "style": "69",
+      "text": "随后选取重要性最高的 top-k 个维度，按预设比例对其进行削弱，并使用同一分类头分别计算原始 embedding 与反事实 embedding 的有害类别概率。置信度下降量定义为："
+    },
+    {
+      "index": 236,
+      "style": "69",
+      "text": "Drop = p(toxic | original) − p(toxic | counterfactual)"
+    },
+    {
+      "index": 237,
+      "style": "69",
+      "text": "实验在同一组 370 个有害样本上比较完整模型 full 与移除 CF 模块的 no_cf。Mean Drop 和 Median Drop 分别表示置信度下降量的均值与中位数；Drop Rate 表示置信度出现下降的样本比例；Toxic→Non-toxic Flip 表示干预后预测由有害类别翻转为无害类别的样本比例。结果如表 4-5 所示。"
+    },
+    {
+      "index": 238,
+      "style": "69",
+      "text": "表 4-5 反事实证据机制分析结果"
+    },
+    {
+      "index": 239,
+      "style": "69",
+      "text": "模型"
+    },
+    {
+      "index": 240,
+      "style": "69",
+      "text": "样本数"
+    },
+    {
+      "index": 241,
+      "style": "69",
+      "text": "Mean Drop"
+    },
+    {
+      "index": 242,
+      "style": "69",
+      "text": "Median Drop"
+    },
+    {
+      "index": 243,
+      "style": "69",
+      "text": "Drop Rate"
+    },
+    {
+      "index": 244,
+      "style": "69",
+      "text": "Toxic→Non-toxic Flip"
+    },
+    {
+      "index": 245,
+      "style": "69",
+      "text": "full"
+    },
+    {
+      "index": 246,
+      "style": "69",
+      "text": "370"
+    },
+    {
+      "index": 247,
+      "style": "69",
+      "text": "0.149"
+    },
+    {
+      "index": 248,
+      "style": "69",
+      "text": "0.109"
+    },
+    {
+      "index": 249,
+      "style": "69",
+      "text": "0.941"
+    },
+    {
+      "index": 250,
+      "style": "69",
+      "text": "0.314"
+    },
+    {
+      "index": 251,
+      "style": "69",
+      "text": "no_cf"
+    },
+    {
+      "index": 252,
+      "style": "69",
+      "text": "370"
+    },
+    {
+      "index": 253,
+      "style": "69",
+      "text": "0.009"
+    },
+    {
+      "index": 254,
+      "style": "69",
+      "text": "0.067"
+    },
+    {
+      "index": 255,
+      "style": "69",
+      "text": "0.616"
+    },
+    {
+      "index": 256,
+      "style": "69",
+      "text": "0.003"
+    },
+    {
+      "index": 257,
+      "style": "69",
+      "text": "在关键维度被削弱后，full 的 Mean Drop 为 0.149，明显高于 no_cf 的 0.009；其 Median Drop 也由 0.067 提高至 0.109。这说明加入 CF 模块后，模型所识别的高贡献维度与有害类别预测之间具有更强的对应关系。"
+    },
+    {
+      "index": 258,
+      "style": "69",
+      "text": "full 的 Drop Rate 为 0.941，即 94.1% 的有害样本在干预后出现置信度下降，而 no_cf 的该比例为 61.6%。此外，full 的 Toxic→Non-toxic Flip 为 31.4%，no_cf 仅为 0.3%。由于上述指标均在定向削弱高贡献维度后计算，较高的置信度下降和类别翻转并不表示模型在正常输入下性能下降，而是表明完整模型的有害类别预测更集中地依赖于这些高贡献维度。"
+    },
+    {
+      "index": 259,
+      "style": "69",
+      "text": "结合消融实验结果，CF 模块不仅提高了 Acc 和 AUC，也增强了模型在关键证据受到干预时的响应一致性。需要说明的是，该分析刻画的是模型内部高贡献维度与预测结果之间的关联，不能据此直接推断这些维度具有明确的人类语义解释。"
+    },
+    {
+      "index": 260,
+      "style": "69",
+      "text": "4.8 本章小结"
+    },
+    {
+      "index": 261,
+      "style": "69",
+      "text": "本章对 SEC-RGCL 的分类性能与核心模块进行了实验分析。与原始 RGCL 基线相比，完整模型的 Acc 和 AUC 分别提高 2.75 和 2.71 个百分点。消融结果表明，语义解释增强与反事实证据学习均能够独立改善模型性能，且二者联合使用时取得最优结果。"
+    },
+    {
+      "index": 262,
+      "style": "69",
+      "text": "进一步分析表明，在保持额外文本分支基本一致的条件下，使用大模型语义解释优于重复输入原始 OCR 文本，说明解释内容能够提供有效的辅助语义信息。反事实证据机制分析显示，加入 CF 模块后，关键高贡献维度被削弱会引起更明显且更一致的有害类别置信度下降。上述结果从性能和决策响应两个方面支持了 SEC-RGCL 的方法设计。"
+    },
+    {
+      "index": 264,
+      "style": "69",
+      "text": "语义解释：该 meme 用“垃圾袋”来讽刺对方“能装”，指责其虚伪、装腔作势。"
+    },
+    {
+      "index": 265,
+      "style": "69",
+      "text": "RGCL:错误qwen-3.5:错误ours:正确"
+    },
+    {
+      "index": 268,
+      "style": "69",
+      "text": "语义解释:通过亲吻场景和“科学家正在努力治愈她们”的文字，隐喻性地表明了性少数群体是需要治愈的"
+    },
+    {
+      "index": 269,
+      "style": "69",
+      "text": "RGCL:错误qwen-3.5:错误ours:正确"
+    },
+    {
+      "index": 270,
+      "style": "139",
+      "text": "ACKNOWLEDGMENTS"
+    },
+    {
+      "index": 271,
+      "style": "141",
+      "text": "Insert paragraph text here. Insert paragraph text here. Insert paragraph text here. Insert paragraph text here. Insert paragraph text here. Insert paragraph text here. Insert paragraph text here. Insert paragraph text here. Insert paragraph text here. Insert paragraph text here. Insert paragraph text here."
+    },
+    {
+      "index": 272,
+      "style": "199",
+      "text": "REFERENCES"
+    },
+    {
+      "index": 273,
+      "style": "244",
+      "text": "[1]Patricia S. Abril and Robert Plant, 2007. The patent holder's dilemma: Buy, sell, or troll? Commun. ACM 50, 1 (Jan, 2007), 36-44. DOI: https://doi.org/10.1145/1188913.1188915."
+    },
+    {
+      "index": 274,
+      "style": "244",
+      "text": "[2]Sten Andler. 1979. Predicate path expressions. In Proceedings of the 6th. ACM SIGACT-SIGPLAN Symposium on Principles of Programming Languages (POPL '79). ACM Press, New York, NY, 226-236. DOI:https://doi.org/10.1145/567752.567774"
+    },
+    {
+      "index": 275,
+      "style": "244",
+      "text": "[3]Ian Editor (Ed.). 2007. The title of book one (1st. ed.). The name of the series one, Vol. 9. University of Chicago Press, Chicago. DOI:https://doi.org/10.1007/3-540-09237-4."
+    },
+    {
+      "index": 276,
+      "style": "244",
+      "text": "[4]David Kosiur. 2001. Understanding Policy-Based Networking (2nd. ed.). Wiley, New York, NY.."
+    },
+    {
+      "index": 277,
+      "style": "379",
+      "text": "Conference Name:ACM Woodstock conference"
+    },
+    {
+      "index": 278,
+      "style": "379",
+      "text": "Conference Short Name:WOODSTOCK’18"
+    },
+    {
+      "index": 279,
+      "style": "379",
+      "text": "Conference Location:El Paso, Texas USA"
+    },
+    {
+      "index": 280,
+      "style": "379",
+      "text": "ISBN:978-1-4503-0000-0/18/06"
+    },
+    {
+      "index": 281,
+      "style": "379",
+      "text": "Year:2018"
+    },
+    {
+      "index": 282,
+      "style": "379",
+      "text": "Date:June"
+    },
+    {
+      "index": 283,
+      "style": "379",
+      "text": "Copyright Year:2018"
+    },
+    {
+      "index": 284,
+      "style": "379",
+      "text": "Copyright Statement:rightsretained"
+    },
+    {
+      "index": 285,
+      "style": "379",
+      "text": "DOI:10.1145/1234567890"
+    },
+    {
+      "index": 286,
+      "style": "379",
+      "text": "RRH: F. Surname et al."
+    },
+    {
+      "index": 287,
+      "style": "379",
+      "text": "Price:$15.00"
+    }
+  ],
+  "tables": [
+    {
+      "index": 0,
+      "rows": [
+        [
+          "模型",
+          "语义解释",
+          "反事实学习",
+          "设置说明"
+        ],
+        [
+          "Baseline",
+          "—",
+          "—",
+          "原始 RGCL 基线模型"
+        ],
+        [
+          "Baseline + Exp",
+          "√",
+          "—",
+          "加入语义解释生成、编码与融合模块"
+        ],
+        [
+          "Baseline + CF",
+          "—",
+          "√",
+          "加入反事实证据学习模块"
+        ],
+        [
+          "Baseline + Text",
+          "OCR 文本",
+          "—",
+          "以原始 OCR 文本替代语义解释输入"
+        ],
+        [
+          "SEC-RGCL",
+          "√",
+          "√",
+          "完整模型"
+        ]
+      ]
+    },
+    {
+      "index": 1,
+      "rows": [
+        [
+          "模型",
+          "Acc",
+          "AUC",
+          "Best Epoch"
+        ],
+        [
+          "Baseline",
+          "0.8117",
+          "0.8351",
+          "21"
+        ],
+        [
+          "SEC-RGCL",
+          "0.8392",
+          "0.8622",
+          "24"
+        ]
+      ]
+    },
+    {
+      "index": 2,
+      "rows": [
+        [
+          "模型",
+          "Exp",
+          "CF",
+          "Acc",
+          "AUC",
+          "Best Epoch"
+        ],
+        [
+          "Baseline",
+          "×",
+          "×",
+          "0.8117",
+          "0.8351",
+          "21"
+        ],
+        [
+          "Baseline + Exp",
+          "√",
+          "×",
+          "0.8275",
+          "0.8526",
+          "33"
+        ],
+        [
+          "Baseline + CF",
+          "×",
+          "√",
+          "0.8175",
+          "0.8416",
+          "20"
+        ],
+        [
+          "SEC-RGCL",
+          "√",
+          "√",
+          "0.8392",
+          "0.8622",
+          "24"
+        ]
+      ]
+    },
+    {
+      "index": 3,
+      "rows": [
+        [
+          "模型",
+          "辅助文本输入",
+          "Acc",
+          "AUC",
+          "Best Epoch"
+        ],
+        [
+          "Baseline",
+          "无",
+          "0.8117",
+          "0.8351",
+          "21"
+        ],
+        [
+          "Baseline + Text",
+          "原始 OCR 文本",
+          "0.8217",
+          "0.8445",
+          "35"
+        ],
+        [
+          "Baseline + Exp",
+          "MLLM 语义解释",
+          "0.8275",
+          "0.8526",
+          "33"
+        ]
+      ]
+    },
+    {
+      "index": 4,
+      "rows": [
+        [
+          "模型",
+          "样本数",
+          "Mean Drop",
+          "Median Drop",
+          "Drop Rate",
+          "Toxic→Non-toxic Flip"
+        ],
+        [
+          "full",
+          "370",
+          "0.149",
+          "0.109",
+          "0.941",
+          "0.314"
+        ],
+        [
+          "no_cf",
+          "370",
+          "0.009",
+          "0.067",
+          "0.616",
+          "0.003"
+        ]
+      ]
+    }
+  ]
+}
