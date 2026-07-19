@@ -98,14 +98,14 @@ def safe_device(requested_device):
 def load_eval_dataloader(args):
     if args.dataset == "FB":
         train, dev, test_seen, test_unseen = load_feats_from_CLIP(
-            os.path.join(args.path, "CLIP_Embedding"), "FB", args.model
+            os.path.join(args.path, "../CLIP_Embedding"), "FB", args.model
         )
         datasets = {"dev": dev, "test_seen": test_seen, "test_unseen": test_unseen}
     else:
         if args.split == "test_unseen":
             raise ValueError("--split test_unseen is only available for FB dataset.")
         train, dev, test_seen = load_feats_from_CLIP(
-            os.path.join(args.path, "CLIP_Embedding"), args.dataset, args.model
+            os.path.join(args.path, "../CLIP_Embedding"), args.dataset, args.model
         )
         datasets = {"dev": dev, "test_seen": test_seen}
 
